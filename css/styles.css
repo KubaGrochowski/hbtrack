@@ -211,3 +211,15 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 /* pora w formularzu */
 .seg.seg4{grid-template-columns:repeat(4,1fr)}
 .seg.seg4 label{font-size:12.5px;padding:8px 2px}
+
+/* konto */
+.acct{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:var(--radius);background:var(--surface-2)}
+.acct div{min-width:0}
+.acct b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct small{display:block;color:var(--ink-3);font-size:12.5px}
+.btn-sm{flex:none;padding:7px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--ink-2)}
+.btn-sm:hover:not(:disabled){background:var(--surface-3);color:var(--ink)}
+.lform{display:flex;flex-direction:column;gap:14px}
+.field input[type=email],.field input[type=password]{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--radius);padding:10px 12px;font:inherit;width:100%}
+.primary:disabled{opacity:.6}
+.l-alt{align-self:center}

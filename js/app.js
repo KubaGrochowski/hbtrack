@@ -60,7 +60,14 @@
   }
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-    catch (_) { toast('Nie udało się zapisać danych w przeglądarce'); }
+    catch (_) { toast('Nie udało się zapisać danych w przeglądarce'); return; }
+    window.Cloud?.changed();
+  }
+  // Stan z chmury (po synchronizacji): zapis lokalny bez oznaczania go jako zmiany z tego urządzenia.
+  function applyState(s) {
+    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, start: s.start });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
+    render();
   }
   const habitsActive = () => state.habits.filter(h => !h.archived);
   const getVal = (h, k) => { const v = state.entries[h.id]?.[k]; return v == null ? null : v; };
@@ -352,13 +359,70 @@
     $('confirm-del').addEventListener('click', () => { state.habits = state.habits.filter(x => x.id !== h.id); delete state.entries[h.id]; save(); close(); render(); });
   }
 
+  /* ---------- konto ---------- */
+  const syncLabel = () => {
+    const C = window.Cloud;
+    if (!C?.user) return '';
+    if (C.status === 'syncing') return 'Synchronizacja…';
+    if (C.status === 'offline') return 'Offline — zsynchronizuje się po połączeniu';
+    if (C.status === 'error') return 'Błąd synchronizacji';
+    if (C.lastSync) return `Zsynchronizowano ${pad(C.lastSync.getHours())}:${pad(C.lastSync.getMinutes())}`;
+    return 'Połączono';
+  };
+  const accountBlock = () => window.Cloud?.user
+    ? `<div class="acct"><div><b>${esc(window.Cloud.user.email)}</b><small id="m-sync">${syncLabel()}</small></div><button id="m-logout" class="btn-sm">Wyloguj</button></div>`
+    : `<button id="m-login">Zaloguj się<small>Te same nawyki na telefonie i komputerze</small></button>`;
+
+  function openLogin() {
+    overlay.innerHTML = sheet('Konto', '', `<form id="lform" class="lform">
+      <div class="field"><label for="l-email">E-mail</label><input id="l-email" type="email" required autocomplete="email" inputmode="email" placeholder="ty@przyklad.pl"></div>
+      <div class="field"><label for="l-pass">Hasło</label><input id="l-pass" type="password" required minlength="6" autocomplete="current-password" placeholder="min. 6 znaków"></div>
+      <button class="primary" type="submit" id="l-in">Zaloguj się</button>
+      <button class="btn-sm l-alt" type="button" id="l-up">Załóż konto</button>
+    </form>`);
+    const f = $('lform');
+    const run = async (mode) => {
+      if (!f.reportValidity()) return;
+      const email = $('l-email').value.trim(), pass = $('l-pass').value;
+      const btns = [$('l-in'), $('l-up')]; btns.forEach(b => { b.disabled = true; });
+      const btn = mode === 'up' ? $('l-up') : $('l-in'), label = btn.textContent; btn.textContent = '…';
+      try {
+        if (mode === 'up') await window.Cloud.signUp(email, pass); else await window.Cloud.signIn(email, pass);
+        close(); render(); toast(mode === 'up' ? 'Konto założone' : 'Zalogowano');
+      } catch (err) { btns.forEach(b => { b.disabled = false; }); btn.textContent = label; toast(authError(err)); }
+    };
+    f.addEventListener('submit', e => { e.preventDefault(); run('in'); });
+    $('l-up').addEventListener('click', () => { $('l-pass').setAttribute('autocomplete', 'new-password'); run('up'); });
+    $('l-email').focus();
+  }
+  function authError(err) {
+    const m = (err?.message || '').toLowerCase(), c = err?.code || '';
+    if (err instanceof TypeError || m.includes('failed to fetch')) return 'Brak połączenia z internetem';
+    if (err?.status === 429 || c === 'over_request_rate_limit' || m.includes('rate')) return 'Za dużo prób — spróbuj za kilka minut';
+    if (c === 'invalid_credentials' || m.includes('invalid login')) return 'Zły e-mail lub hasło';
+    if (c === 'user_already_exists' || m.includes('already registered')) return 'To konto już istnieje — zaloguj się';
+    if (c === 'weak_password' || m.includes('password')) return 'Hasło musi mieć co najmniej 6 znaków';
+    if (c === 'email_address_invalid' || m.includes('email')) return 'Sprawdź adres e-mail';
+    return 'Nie udało się: ' + (err?.message || 'nieznany błąd');
+  }
+
   function openMenu() {
-    overlay.innerHTML = sheet('Tygodnik', 'dane zapisane w tej przeglądarce', `<div class="menu">
+    overlay.innerHTML = sheet('Tygodnik', '', `<div class="menu">
+      ${accountBlock()}
       ${installPrompt ? `<button id="m-install">Zainstaluj aplikację<small>Ikona na ekranie głównym, działa bez internetu</small></button>` : ''}
       <button id="m-export">Eksportuj kopię (JSON)<small>Pobierz plik ze wszystkimi nawykami i wpisami</small></button>
       <button id="m-import">Wczytaj kopię<small>Zastąpi obecne dane plikiem JSON</small></button>
-      <button id="m-reset">Wyczyść wszystko<small>Usuwa nawyki i wpisy z tej przeglądarki</small></button>
+      <button id="m-reset">Wyczyść wszystko<small>${window.Cloud?.user ? 'Usuwa nawyki i wpisy, także z konta' : 'Usuwa nawyki i wpisy z tej przeglądarki'}</small></button>
     </div><input type="file" id="m-file" accept="application/json" hidden>`);
+    $('m-login')?.addEventListener('click', openLogin);
+    $('m-logout')?.addEventListener('click', async () => {
+      const b = $('m-logout'); b.disabled = true; b.textContent = '…';
+      try {
+        await window.Cloud.signOut();
+        applyState({ habits: [], entries: {}, notes: {} });
+        close(); toast('Wylogowano');
+      } catch (err) { b.disabled = false; b.textContent = 'Wyloguj'; toast(err.message); }
+    });
     $('m-install')?.addEventListener('click', async () => {
       close();
       const p = installPrompt; installPrompt = null;
@@ -590,4 +654,10 @@
 
   render();
   scheduleMidnight();
+
+  /* ---------- konto i synchronizacja (js/cloud.js) ---------- */
+  if (window.Cloud) {
+    window.Cloud.onChange(() => { const el = $('m-sync'); if (el) el.textContent = syncLabel(); });
+    window.Cloud.attach({ getState: () => state, applyState });
+  }
 })();

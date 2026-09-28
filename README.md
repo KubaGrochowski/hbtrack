@@ -20,7 +20,17 @@ Tygodnik jest PWA: po wrzuceniu na hosting z HTTPS (np. GitHub Pages) można go 
 - **Android / Chrome / Edge:** menu ⋯ w aplikacji → „Zainstaluj aplikację” (albo ikona instalacji w pasku adresu).
 - **iPhone / Safari:** przycisk Udostępnij → „Do ekranu początkowego”.
 
-Dane zostają na urządzeniu (każde urządzenie ma własne). Po zmianach w plikach aplikacji podbij `VERSION` w `sw.js`, żeby stara pamięć podręczna została wyczyszczona.
+Bez logowania dane zostają na urządzeniu (każde urządzenie ma własne).
+
+## Konto i synchronizacja (Supabase)
+
+Menu ⋯ → „Zaloguj się”: e-mail + hasło („Załóż konto” przy pierwszym razie). Po zalogowaniu dane synchronizują się między urządzeniami (`js/cloud.js`, bez zewnętrznych bibliotek):
+
+- każdy element (nawyk, wpis, notatka, kolejność) ma znacznik czasu zmiany, przy łączeniu wygrywa nowszy, usunięcia też się przenoszą;
+- aplikacja dalej działa offline, zmiany wysyłają się po odzyskaniu połączenia;
+- wylogowanie najpierw wysyła zmiany, potem czyści dane z urządzenia.
+
+W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (każdy widzi tylko swój wiersz), w Authentication wyłączone „Confirm email”. W kodzie jest tylko klucz publiczny (`sb_publishable_…`); kluczy `service_role`/secret nie wolno tu dodawać. Po zmianach w plikach aplikacji podbij `VERSION` w `sw.js`, żeby stara pamięć podręczna została wyczyszczona.
 
 ## Obsługa
 

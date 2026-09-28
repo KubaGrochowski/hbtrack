@@ -1,10 +1,11 @@
 /* Tygodnik — service worker: aplikacja działa offline. Dane nawyków nie są tu przechowywane (zostają w localStorage). */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `tygodnik-${VERSION}`;
 const SHELL = [
   './',
   'index.html',
   'css/styles.css',
+  'js/cloud.js',
   'js/app.js',
   'manifest.webmanifest',
   'icons/favicon.png',
