@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=5">
+<link rel="stylesheet" href="css/styles.css?v=6">
 </head>
 <body>
 <section class="auth" id="auth" hidden>
@@ -27,8 +27,8 @@
       <button class="vtab" role="tab" data-auth="up" aria-selected="false">Załóż konto</button>
     </nav>
     <form id="auth-form" class="lform" novalidate>
-      <div class="field"><label for="a-email">E-mail</label><input id="a-email" type="email" required autocomplete="email" inputmode="email" placeholder="ty@przyklad.pl"></div>
-      <div class="field"><label for="a-pass">Hasło</label><input id="a-pass" type="password" required minlength="6" autocomplete="current-password" placeholder="min. 6 znaków"></div>
+      <div class="field"><label for="a-email">E-mail</label><input id="a-email" type="email" required autocomplete="email" inputmode="email"></div>
+      <div class="field"><label for="a-pass">Hasło</label><input id="a-pass" type="password" required minlength="6" autocomplete="current-password"></div>
       <div class="field" id="a-pass2-row" hidden><label for="a-pass2">Powtórz hasło</label><input id="a-pass2" type="password" minlength="6" autocomplete="new-password"></div>
       <p class="auth-err" id="auth-err" role="alert" hidden></p>
       <button class="primary" type="submit" id="a-submit">Zaloguj się</button>
@@ -66,7 +66,7 @@
 </main>
 
 <div id="overlay"></div>
-<script src="js/cloud.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/cloud.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

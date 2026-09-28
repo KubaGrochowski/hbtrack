@@ -17,7 +17,6 @@ p{margin:0}
 .wrap{max-width:1040px;margin:0 auto}
 .eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .empty{color:var(--ink-3);text-align:center;padding:40px 16px}
-.link{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:3px}
 
 /* header */
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
@@ -220,7 +219,7 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 .auth-err{margin:0;color:var(--miss);font-size:13.5px;text-align:center}
 
 /* konto na dole strony */
-.acct-foot{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:40px;color:var(--ink-3);font-size:13px}
+.acct-foot{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:40px;padding-bottom:48px;color:var(--ink-3);font-size:13px}
 .acct-foot button{color:var(--ink-2);font-weight:600;text-decoration:underline;text-underline-offset:3px}
 .acct-foot button:hover{color:var(--ink)}
 .acct-foot button:disabled{opacity:.5}

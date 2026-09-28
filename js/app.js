@@ -200,7 +200,7 @@
       noteBox.innerHTML = `<input id="note-input" type="text" maxlength="140" placeholder="Notatka" autocomplete="off" value="${esc(noteOf(key(selDay)))}" data-k="${key(selDay)}">`;
     }
     if (!hs.length) {
-      $('empty').innerHTML = `Nie masz jeszcze nawyków. Kliknij „+ Nawyk”, żeby dodać pierwszy, albo <button class="link" id="seed">wczytaj przykładowe</button>.`;
+      $('empty').innerHTML = `Nie masz jeszcze nawyków. Kliknij „+ Nawyk”, żeby dodać pierwszy.`;
       $('list').innerHTML = '';
       $('view-calendar').innerHTML = '';
       $('view-week').hidden = false;
@@ -318,9 +318,9 @@
     const h = hid ? state.habits.find(x => x.id === hid) : null;
     const days = h ? h.days : [];
     const body = `<form id="hform">
-      <div class="field"><label for="f-name">Nazwa</label><input id="f-name" type="text" required placeholder="np. Medytacja" maxlength="30" value="${h ? esc(h.name) : ''}"></div>
+      <div class="field"><label for="f-name">Nazwa</label><input id="f-name" type="text" required maxlength="30" value="${h ? esc(h.name) : ''}"></div>
       <div class="field"><span class="lab">Rodzaj</span><div class="seg"><label><input type="radio" name="f-type" id="f-type-bool" value="bool" ${!h || h.type === 'bool' ? 'checked' : ''}><span>Tak / nie</span></label><label><input type="radio" name="f-type" id="f-type-num" value="num" ${h && h.type === 'num' ? 'checked' : ''}><span>Liczbowy</span></label></div></div>
-      <div class="row3" id="f-numfields"><div class="field"><label for="f-target">Cel dzienny</label><input id="f-target" type="number" min="0.01" step="any" value="${h?.target ?? 10}"></div><div class="field"><label for="f-unit">Jednostka</label><input id="f-unit" type="text" value="${h ? esc(h.unit) : 'min'}" maxlength="10"></div><div class="field"><label for="f-step">Krok +/−</label><input id="f-step" type="number" min="0.01" step="any" value="${h?.step ?? 1}"></div></div>
+      <div class="row3" id="f-numfields"><div class="field"><label for="f-target">Cel dzienny</label><input id="f-target" type="number" min="0.01" step="any" value="${h?.target ?? ''}"></div><div class="field"><label for="f-unit">Jednostka</label><input id="f-unit" type="text" value="${h ? esc(h.unit) : ''}" maxlength="10"></div><div class="field"><label for="f-step">Krok +/−</label><input id="f-step" type="number" min="0.01" step="any" value="${h?.step ?? 1}"></div></div>
       <div class="field"><div class="daypick" role="group" aria-label="Dni nawyku">${DAYS.map((d, i) => `<label><input type="checkbox" id="f-d${i}" value="${i}" ${days.includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div></div>
       <div class="field"><span class="lab">Pora</span><div class="seg seg4">${[['', '—'], ...TIMES].map(([v, l]) => `<label><input type="radio" name="f-time" id="f-time-${v || 'any'}" value="${v}" ${(h?.time || '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
       <button class="primary" type="submit">${h ? 'Zapisz' : 'Dodaj'}</button>
@@ -337,7 +337,9 @@
       const type = f.querySelector('input[name="f-type"]:checked').value;
       const sel = [...f.querySelectorAll('.daypick input:checked')].map(x => +x.value);
       if (!sel.length) { toast('Wybierz przynajmniej jeden dzień'); return; }
-      const target = Math.max(0.01, parseFloat($('f-target').value) || 1);
+      const rawTarget = parseFloat($('f-target').value);
+      if (type === 'num' && !(rawTarget > 0)) { toast('Podaj cel dzienny'); $('f-target').focus(); return; }
+      const target = Math.max(0.01, rawTarget || 1);
       const step = Math.max(0.01, parseFloat($('f-step').value) || 1);
       const unit = $('f-unit').value.trim();
       const time = f.querySelector('input[name="f-time"]:checked')?.value || '';
@@ -417,19 +419,6 @@
     finally { b.disabled = false; }
   });
 
-  function seed() {
-    const c = todayKey();
-    state.habits.push(
-      { id: 'woda', name: 'Woda', type: 'num', target: 2, unit: 'L', step: 0.25, days: ALL, created: c },
-      { id: 'kroki', name: 'Kroki', type: 'num', target: 8000, unit: 'kroków', step: 500, days: ALL, created: c },
-      { id: 'czyt', name: 'Czytanie', type: 'num', target: 20, unit: 'min', step: 5, days: ALL, created: c },
-      { id: 'sen', name: 'Sen', type: 'num', target: 7, unit: 'h', step: 0.5, days: ALL, created: c },
-      { id: 'silownia', name: 'Siłownia', type: 'bool', days: [0, 2, 4], created: c },
-      { id: 'slodycze', name: 'Bez słodyczy', type: 'bool', days: ALL, created: c },
-    );
-    save(); render();
-  }
-
   /* ---------- zdarzenia ---------- */
   document.addEventListener('click', e => {
     const c = e.target.closest('.ob'); if (c && !c.disabled) {
@@ -458,7 +447,6 @@
     const go = e.target.closest('[data-goto]');
     if (go && !go.disabled) { const g = fromKey(go.dataset.goto); weekStart = g < fromKey(state.start) ? fromKey(state.start) : g; if (go.dataset.day) selDay = fromKey(go.dataset.day); setView('week'); window.scrollTo({ top: 0 }); return; }
     if (e.target.closest('#add-habit')) { openHabitForm(null); return; }
-    if (e.target.closest('#seed')) { seed(); return; }
     const nav = e.target.closest('[data-nav]'); if (nav) { if (!nav.disabled) step(+nav.dataset.nav); return; }
     if (e.target.closest('#this-week')) { selDay = dayOnly(new Date()); weekStart = startOfWeek(new Date()); monthStart = monthOf(new Date()); render(); }
   });
