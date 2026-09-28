@@ -6,7 +6,8 @@
   --f-display:"Outfit",system-ui,sans-serif;--f-body:"Outfit",system-ui,sans-serif;--f-mono:"JetBrains Mono",ui-monospace,monospace;
 }
 *{box-sizing:border-box}
-html,body{height:100%;overflow-x:hidden;overscroll-behavior-x:none;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{height:100%}
+html,body{min-height:100%;overflow-x:clip;overscroll-behavior-x:none;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);padding-inline:16px;padding-block:calc(28px + env(safe-area-inset-top,0px)) calc(48px + env(safe-area-inset-bottom,0px))}
 button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
 button:disabled{cursor:default}
@@ -209,7 +210,7 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 .primary:disabled{opacity:.6}
 
 /* ekran logowania */
-.auth{min-height:100%;display:grid;place-items:center;padding-block:24px}
+.auth{min-height:calc(100svh - 76px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:grid;place-items:center;padding-block:24px}
 .auth-card{width:min(380px,100%);display:flex;flex-direction:column;gap:22px}
 .auth-brand{display:flex;flex-direction:column;align-items:center;gap:12px}
 .auth-brand img{border-radius:14px}
@@ -238,3 +239,13 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 .nav-item:hover{background:var(--surface-3);color:var(--ink)}
 .nav-item.on{color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
 .nav-item.out{margin-top:10px;color:var(--miss)}
+
+/* telefon: „+ Nawyk” przyklejony do dołu ekranu */
+@media (max-width:680px){
+  #add-habit{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;height:52px;justify-content:center;font-size:16px;background:var(--ink);color:var(--bg);border:0;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+  #add-habit:hover{background:var(--ink)}
+  #add-habit b{color:var(--bg)}
+  body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .auth{min-height:calc(100svh - 124px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+}
