@@ -18,7 +18,7 @@ i otwórz http://localhost:5173.
 - **Android / Chrome:** przeglądarka sama proponuje instalację (albo menu ⋮ → „Zainstaluj aplikację”).
 - **iPhone:** Udostępnij → „Do ekranu początkowego”.
 
-Po zmianach w plikach aplikacji podbij `VERSION` w `sw.js`, żeby stara pamięć podręczna została wyczyszczona.
+Po zmianach w plikach aplikacji podbij numer wersji: `VERSION` w `sw.js` oraz `?v=` przy plikach CSS/JS w `index.html` i w liście `SHELL` w `sw.js`.
 
 ## Konto i synchronizacja (Supabase)
 

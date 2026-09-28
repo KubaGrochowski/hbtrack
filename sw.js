@@ -1,12 +1,12 @@
 /* Tygodnik — service worker: aplikacja działa offline. Dane nawyków nie są tu przechowywane (zostają w localStorage). */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `tygodnik-${VERSION}`;
 const SHELL = [
   './',
   'index.html',
-  'css/styles.css',
-  'js/cloud.js',
-  'js/app.js',
+  'css/styles.css?v=4',
+  'js/cloud.js?v=4',
+  'js/app.js?v=4',
   'manifest.webmanifest',
   'icons/favicon.png',
   'icons/icon-192.png',
@@ -46,7 +46,7 @@ self.addEventListener('fetch', e => {
 
   // Pliki aplikacji: najpierw sieć (żeby zmiany docierały od razu), bez sieci z pamięci.
   e.respondWith(
-    fetch(req)
+    fetch(req.url, { cache: 'no-cache' }) // zawsze sprawdza na serwerze, czy plik się zmienił (GitHub Pages trzyma pliki 10 min)
       .then(r => {
         if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
         return r;
