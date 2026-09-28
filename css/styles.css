@@ -22,7 +22,7 @@ p{margin:0}
 /* header */
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
 .o-hero{display:flex;align-items:baseline;gap:14px;margin-top:8px;flex-wrap:wrap}
-.o-hero b{font:700 clamp(56px,9vw,88px)/1 var(--f-display);letter-spacing:-.04em}
+.o-hero b{font:700 clamp(56px,9vw,88px)/1 var(--f-display);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
 .o-hero span{color:var(--ink-2);font-size:15px}
 .o-hero span em{font-style:normal;color:var(--accent)}
 .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -166,7 +166,7 @@ p{margin:0}
 .confirm button{padding:12px;border-radius:var(--radius);font-weight:600;background:var(--surface-2)}
 .confirm .yes{background:var(--miss);color:#000}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:60;max-width:calc(100% - 32px);display:flex;align-items:center;gap:14px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
 /* seria */
 .streak{display:inline-flex;align-items:center;gap:3px;flex:none;color:var(--warn);font:600 12px var(--f-mono)}
@@ -249,3 +249,45 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
   .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   .auth{min-height:calc(100svh - 124px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
 }
+
+/* ---------- animacje i przejścia ---------- */
+:root{--ease:cubic-bezier(.2,.8,.2,1)}
+html{scroll-behavior:smooth}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop-in{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes check-pop{0%{transform:scale(.6)}60%{transform:scale(1.14)}100%{transform:scale(1)}}
+@keyframes check-draw{from{stroke-dashoffset:20}to{stroke-dashoffset:0}}
+@keyframes slide-l{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes slide-r{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@keyframes toast-in{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* przyciski i zakładki */
+button{transition:background-color .18s,color .18s,border-color .18s,opacity .18s,transform .12s,box-shadow .18s}
+button:not(:disabled):active{transform:scale(.96)}
+.grip:active,.navarr:active{transform:none}
+
+/* kółka: zmiana koloru i „pyknięcie” przy odhaczeniu, ptaszek się rysuje */
+.c{transition:background-color .2s,box-shadow .2s,color .2s}
+.ob:hover:not(:disabled) .c{transform:scale(1.06)}
+.c.just{animation:check-pop .32s var(--ease)}
+.c.just svg path{stroke-dasharray:20;animation:check-draw .28s .06s var(--ease) both}
+.prog i,.abar i{transition:width .3s var(--ease)}
+
+/* wiersze wchodzą kaskadowo po nawigacji; przy zmianie dnia/tygodnia przesuwają się w stronę ruchu */
+.o-list.enter .o-row{animation:rise .32s var(--ease) backwards;animation-delay:calc(var(--i,0)*30ms)}
+#view-week.slide-l #list,#view-week.slide-l #day-head{animation:slide-l .26s var(--ease) backwards}
+#view-week.slide-r #list,#view-week.slide-r #day-head{animation:slide-r .26s var(--ease) backwards}
+
+/* kalendarz */
+.cal.enter .cd{animation:fade-in .25s both;animation-delay:calc(var(--i,0)*6ms)}
+.cd{transition:transform .15s,filter .15s}
+.cd:not(.blank):not(:disabled):hover{transform:scale(1.06)}
+
+/* okienka, powiadomienia, ekrany */
+.scrim{animation:fade-in .18s ease-out}
+.sheet{animation:pop-in .24s var(--ease)}
+.toast{animation:toast-in .22s var(--ease)}
+#app-main:not([hidden]){animation:fade-in .3s ease-out}
+.auth:not([hidden]) .auth-card{animation:rise .4s var(--ease)}
+.day-note input{transition:border-color .2s,color .2s}

@@ -40,6 +40,8 @@
   const isMobile = () => mq.matches;
   const dayOnly = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
   let selDay = dayOnly(new Date());
+  // Animacje: wejście listy (po nawigacji), kierunek przesunięcia dnia/tygodnia, ostatnio zmienione kółko.
+  let animList = true, slideDir = 0, justCell = null;
   let edit = null;
   let rowMenu = null;
   let view = 'week';
@@ -142,20 +144,36 @@
   const navBtn = dir => `<button class="navarr" data-nav="${dir}" ${dir < 0 && !canPrev() ? 'disabled' : ''} aria-label="${dir < 0 ? 'Wstecz' : 'Dalej'}">${dir < 0 ? '‹' : '›'}</button>`;
   function renderCalendar() {
     const t = todayKey(), days = monthDays(monthStart);
-    let cal = `<div class="cal-nav">${navBtn(-1)}<div class="cal-h">${DAYS.map(d => `<span>${d}</span>`).join('')}</div>${navBtn(1)}</div><div class="cal">`;
+    let cal = `<div class="cal-nav">${navBtn(-1)}<div class="cal-h">${DAYS.map(d => `<span>${d}</span>`).join('')}</div>${navBtn(1)}</div><div class="cal${animList ? ' enter' : ''}">`;
     for (let i = 0; i < dow(days[0]); i++) cal += `<span class="cd blank"></span>`;
-    days.forEach(d => {
+    days.forEach((d, idx) => {
       const k = key(d), fut = k > t, pre = k < state.start, p = fut || pre ? null : dayPct(d);
       const note = noteOf(k);
       const cls = `cd${fut ? ' fut' : ''}${pre ? ' pre' : ''}${p == null ? ' none' : ''}${p != null ? ' hi' : ''}${k === t ? ' today' : ''}${note ? ' has-note' : ''}`;
       const tip = esc(`${DAYS_FULL[dow(d)]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}: ${p == null ? 'brak danych' : pct(p) + '%'}${note ? ' · ' + note : ''}`);
-      cal += `<button class="${cls}" ${pre ? "disabled" : ""} data-goto="${key(startOfWeek(d))}" data-day="${k}" ${p == null ? '' : `style="--heat:${heat(p)}"`} aria-label="${tip}"><b>${d.getDate()}</b>${p == null ? '' : `<small>${pct(p)}%</small>`}</button>`;
+      cal += `<button class="${cls}" ${pre ? "disabled" : ""} data-goto="${key(startOfWeek(d))}" data-day="${k}" style="--i:${idx}${p == null ? '' : `;--heat:${heat(p)}`}" aria-label="${tip}"><b>${d.getDate()}</b>${p == null ? '' : `<small>${pct(p)}%</small>`}</button>`;
     });
     $('view-calendar').innerHTML = `<section class="panel">${cal}</div></section>`;
   }
 
   /* ---------- render ---------- */
   const $ = id => document.getElementById(id);
+  // Płynne przeliczanie dużego procentu (zamiast skoku liczby).
+  let shownPct = null, pctRaf = 0, pctEnd = 0;
+  function showPct(v) {
+    const el = $('week-pct'); cancelAnimationFrame(pctRaf); clearTimeout(pctEnd);
+    if (v == null) { el.textContent = '—'; shownPct = null; return; }
+    const from = shownPct ?? v, t0 = performance.now(), dur = 350;
+    shownPct = v;
+    if (document.hidden || from === v) { el.textContent = v + '%'; return; }
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(from + (v - from) * e) + '%';
+      if (k < 1) pctRaf = requestAnimationFrame(tick);
+    };
+    tick(t0);
+    pctEnd = setTimeout(() => { cancelAnimationFrame(pctRaf); el.textContent = v + '%'; }, dur + 50); // zapas, gdy karta w tle wstrzyma klatki
+  }
   function render() {
     const mobile = isMobile();
     if (mobile) weekStart = startOfWeek(selDay);
@@ -177,11 +195,11 @@
     if (view === 'calendar') {
       const m = monthPct(monthStart);
       $('week-label').textContent = `${MONTHS_NOM[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
-      $('week-pct').textContent = m == null ? '—' : pct(m) + '%';
+      showPct(m == null ? null : pct(m));
       $('today-label').textContent = '';
     } else {
       $('week-label').textContent = range;
-      $('week-pct').textContent = pct(overall() ?? 0) + '%';
+      showPct(pct(overall() ?? 0));
       const cur = key(dates[0]) <= t && t <= key(end);
       if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `${DAYS_FULL[dow(new Date())].toLowerCase()} | <em>${a}/${b}</em>`; }
       else $('today-label').textContent = key(end) < t ? 'miniony tydzień' : 'nadchodzący tydzień';
@@ -217,17 +235,24 @@
     const isOff = h => ref && status(h, ref) === 'off';
     const cur = hs.filter(h => !isLater(h)), later = hs.filter(isLater);
     const onList = cur.filter(h => !isOff(h)), offList = cur.filter(isOff);
+    let rowIdx = 0;
     let html = onList.map(rowHtml).join('');
     if (offList.length) html += (onList.length ? `<div class="grp sep"></div>` : '') + offList.map(rowHtml).join('');
     if (later.length) html += `<div class="grp later">Dodane później</div>` + later.map(rowHtml).join('');
-    $('list').innerHTML = html;
+    const vw = $('view-week'), listEl = $('list');
+    vw.classList.remove('slide-l', 'slide-r'); listEl.classList.remove('enter');
+    if (slideDir || animList) void vw.offsetWidth; // wymusza restart animacji
+    if (slideDir) vw.classList.add(slideDir > 0 ? 'slide-l' : 'slide-r'); else if (animList) listEl.classList.add('enter');
+    listEl.innerHTML = html;
+    animList = false; slideDir = 0; justCell = null;
 
     function rowHtml(h) {
+      const idx = rowIdx++;
       const cells = shown.map(d => {
         const s = status(h, d), v = getVal(h, key(d));
         const dis = s === 'future' || s === 'off' || s === 'pre';
         const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
-        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}" style="--p:${pct(prog(h, v))}">${s === 'done' ? CHECK : ''}</span></button>`;
+        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}" style="--p:${pct(prog(h, v))}">${s === 'done' ? CHECK : ''}</span></button>`;
       }).join('');
       const open = rowMenu === h.id;
       const acts = open
@@ -245,7 +270,7 @@
       const tl = TIMES.find(([v]) => v === h.time)?.[1];
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
       const fire = sk >= 2 ? `<span class="streak" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
-      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${tod}${fire}</b><small>${sub}</small></div></div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
+      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${tod}${fire}</b><small>${sub}</small></div></div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
     }
   }
 
@@ -299,7 +324,7 @@
     if (inp) {
       inp.addEventListener('input', () => {
         const n = parseFloat(inp.value.replace(',', '.'));
-        setVal(h, k, isNaN(n) ? null : Math.max(0, n)); render();
+        setVal(h, k, isNaN(n) ? null : Math.max(0, n)); justCell = { h: h.id, k }; render();
         const p = prog(h, getVal(h, k)); const bar = overlay.querySelector('.prog i'); bar.style.width = p * 100 + '%'; bar.classList.toggle('full', p >= 1);
       });
       inp.focus(); inp.select();
@@ -310,7 +335,7 @@
     const b = e.target.closest('[data-ed]'); if (!b || !edit) return;
     const h = state.habits.find(x => x.id === edit.hid), k = edit.k, a = b.dataset.ed, v = getVal(h, k) || 0;
     const map = { '+': +(v + h.step).toFixed(2), '-': Math.max(0, +(v - h.step).toFixed(2)), clear: null, half: h.target / 2, target: h.target, yes: 1, no: 0 };
-    setVal(h, k, map[a]); render();
+    setVal(h, k, map[a]); justCell = { h: h.id, k }; render();
     if (h.type === 'bool' && a !== 'clear') { close(); return; }
     drawEditor();
   });
@@ -444,7 +469,7 @@
     const c = e.target.closest('.ob'); if (c && !c.disabled) {
       const h = state.habits.find(x => x.id === c.dataset.h);
       // tak/nie: klik przełącza tylko zrobione ↔ puste
-      if (h.type === 'bool') { setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); render(); }
+      if (h.type === 'bool') { setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; render(); }
       else openEditor(h.id, c.dataset.k);
       return;
     }
@@ -465,10 +490,10 @@
       setView(vt.dataset.view); return;
     }
     const go = e.target.closest('[data-goto]');
-    if (go && !go.disabled) { const g = fromKey(go.dataset.goto); weekStart = g < fromKey(state.start) ? fromKey(state.start) : g; if (go.dataset.day) selDay = fromKey(go.dataset.day); setView('week'); window.scrollTo({ top: 0 }); return; }
+    if (go && !go.disabled) { const g = fromKey(go.dataset.goto); weekStart = g < fromKey(state.start) ? fromKey(state.start) : g; if (go.dataset.day) selDay = fromKey(go.dataset.day); animList = true; setView('week'); window.scrollTo({ top: 0 }); return; }
     if (e.target.closest('#add-habit')) { openHabitForm(null); return; }
     const nav = e.target.closest('[data-nav]'); if (nav) { if (!nav.disabled) step(+nav.dataset.nav); return; }
-    if (e.target.closest('#this-week')) { selDay = dayOnly(new Date()); weekStart = startOfWeek(new Date()); monthStart = monthOf(new Date()); render(); }
+    if (e.target.closest('#this-week')) { selDay = dayOnly(new Date()); weekStart = startOfWeek(new Date()); monthStart = monthOf(new Date()); animList = true; render(); }
   });
   // Nie da się cofnąć przed pierwszy tydzień aplikacji (state.start) ani przed jego miesiąc.
   function canPrev() {
@@ -478,12 +503,12 @@
   }
   function step(dir) {
     if (dir < 0 && !canPrev()) return;
-    if (view === 'calendar') monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1);
-    else if (isMobile()) { selDay = addDays(selDay, dir); weekStart = startOfWeek(selDay); }
-    else weekStart = addDays(weekStart, 7 * dir);
+    if (view === 'calendar') { monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1); animList = true; }
+    else if (isMobile()) { selDay = addDays(selDay, dir); weekStart = startOfWeek(selDay); slideDir = dir; }
+    else { weekStart = addDays(weekStart, 7 * dir); slideDir = dir; }
     render();
   }
-  function setView(v) { view = v; rowMenu = null; try { localStorage.setItem('hbtrack.view', view); } catch (_) { } render(); }
+  function setView(v) { view = v; rowMenu = null; animList = true; try { localStorage.setItem('hbtrack.view', view); } catch (_) { } render(); }
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && overlay.innerHTML) close();
     else if (e.key === 'Escape' && rowMenu) { const id = rowMenu; rowMenu = null; render(); document.querySelector(`[data-more="${id}"]`)?.focus(); return; }
@@ -608,7 +633,7 @@
     s.row.style.transform = '';
     if (cancelled || Math.abs(s.dx) < 80) return;
     const h = state.habits.find(x => x.id === s.id); if (!h) return;
-    setVal(h, key(selDay), s.dx > 0 ? (h.type === 'bool' ? 1 : h.target) : null);
+    setVal(h, key(selDay), s.dx > 0 ? (h.type === 'bool' ? 1 : h.target) : null); justCell = { h: h.id, k: key(selDay) };
     render();
   };
   list.addEventListener('pointerup', e => endSwipe(e, false));
