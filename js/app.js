@@ -195,10 +195,12 @@
     if (view === 'calendar') {
       const m = monthPct(monthStart);
       $('week-label').textContent = `${MONTHS_NOM[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
+      $('week-label').hidden = false;
       showPct(m == null ? null : pct(m));
       $('today-label').textContent = '';
     } else {
       $('week-label').textContent = range;
+      $('week-label').hidden = mobile; // na telefonie bez zakresu tygodnia u góry
       showPct(pct(overall() ?? 0));
       const cur = key(dates[0]) <= t && t <= key(end);
       if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `<em>${a}/${b}</em>`; }
