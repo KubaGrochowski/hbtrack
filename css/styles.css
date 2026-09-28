@@ -76,7 +76,7 @@ p{margin:0}
 .o-days span{text-align:center;font:600 11px var(--f-mono);color:var(--ink-3);text-transform:uppercase}
 .o-days .o-track span.t{color:var(--ink)}
 .o-days .o-track span.t em{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:4px}
-.o-days span em{display:block;font-style:normal;font-size:11px;color:var(--ink-3);font-weight:500}
+.o-days span em{display:block;font-style:normal;font-size:11px;color:var(--ink-3);font-weight:500;margin-top:3px}
 .o-days{align-items:center}
 .o-days .lbl{display:flex;justify-content:flex-end}
 .o-days .sp{display:flex;justify-content:center}
@@ -109,7 +109,7 @@ p{margin:0}
   .o-days.single{grid-template-columns:36px 1fr 36px;gap:8px;padding:0 0 12px}
   .o-days.single .navarr{width:36px;height:36px;font-size:20px}
   .dayname{text-align:center;font:600 15px var(--f-body);color:var(--ink-2);text-transform:none}
-  .dayname em{display:block;font:500 12px var(--f-mono);font-style:normal;color:var(--ink-3);margin-top:2px}
+  .dayname em{display:block;font:500 12px var(--f-mono);font-style:normal;color:var(--ink-3);margin-top:6px}
   .dayname.t{color:var(--ink)}
   .dayname.t em{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:4px}
   .o-row{grid-template-columns:1fr auto 28px;gap:12px;padding:12px 14px;align-items:center}
