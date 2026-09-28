@@ -293,3 +293,19 @@ button:not(:disabled):active{transform:scale(.96)}
 #app-main:not([hidden]){animation:fade-in .3s ease-out}
 .auth:not([hidden]) .auth-card{animation:rise .4s var(--ease)}
 .day-note input{transition:border-color .2s,color .2s}
+
+/* licznik czasu */
+.tbtn{flex:none;width:30px;height:30px;border-radius:50%;margin-left:auto;display:grid;place-items:center;color:var(--ink-3);border:1px solid var(--line)}
+.tbtn:hover{color:var(--ink);background:var(--surface-3)}
+.tbtn.on{background:var(--accent);color:#04180C;border-color:transparent;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.timer-card{display:grid;grid-template-columns:1fr auto auto;gap:6px 14px;align-items:center;margin:0 0 12px;padding:14px 16px;border-radius:var(--radius);background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));animation:rise .3s var(--ease) backwards}
+.timer-card[hidden]{display:none}
+.tinfo{min-width:0}
+.tinfo b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tinfo small{color:var(--ink-3);font-size:12.5px}
+.ttime{font:600 30px/1 var(--f-mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--accent)}
+.tstop{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-weight:600;font-size:14px}
+.tstop:hover{background:var(--surface-3)}
+.tbar{grid-column:1/-1;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden}
+.tbar i{display:block;height:100%;background:var(--accent);transition:width 1s linear}
+@media (max-width:680px){.o-row .name .tbtn{margin-left:auto;margin-right:2px}}

@@ -130,6 +130,8 @@
   const PENCIL = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3L5.5 13.5H2.5v-3l8-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4l3 3" stroke="currentColor" stroke-width="1.6"/></svg>';
   const XMARK = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
   const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
+  const CLOCK = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const STOP = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="currentColor"/></svg>';
   const FLAME = '<svg width="11" height="13" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 .5c.4 2.4 3.8 3.9 3.8 7.6a3.8 3.8 0 0 1-7.6 0c0-1.5.8-2.6 1.6-3.3.1 1.2.7 2 1.5 2.3C5 5.1 5.1 2.6 6 .5z" fill="currentColor"/></svg>';
 
   /* ---------- kalendarz ---------- */
@@ -247,6 +249,7 @@
     if (slideDir) vw.classList.add(slideDir > 0 ? 'slide-l' : 'slide-r'); else if (animList) listEl.classList.add('enter');
     listEl.innerHTML = html;
     animList = false; slideDir = 0; justCell = null;
+    renderTimerCard();
 
     function rowHtml(h) {
       const idx = rowIdx++;
@@ -268,11 +271,17 @@
         if (s === 'off') sub = 'nie dziś';
         else if (h.type === 'num') sub = `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}`;
       }
+      // licznik czasu: dla nawyków w minutach/godzinach, na dziś, dopóki cel nie jest zrobiony
+      const tk = todayKey(), canTime = timeUnit(h) && (mobile ? key(selDay) === tk : true) && status(h, fromKey(tk)) !== 'done' && status(h, fromKey(tk)) !== 'off';
+      const running = timer && timer.hid === h.id;
+      const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
+        : canTime ? `<button class="tbtn" data-timer="${h.id}" aria-label="Uruchom licznik: ${esc(h.name)}">${CLOCK}</button>` : '';
+      if (running) sub = `<span data-timer-left>${fmtLeft(timerLeft())}</span> pozostało`;
       const sk = streak(h);
       const tl = TIMES.find(([v]) => v === h.time)?.[1];
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
       const fire = sk >= 2 ? `<span class="streak" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
-      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${tod}${fire}</b><small>${sub}</small></div></div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
+      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
     }
   }
 
@@ -466,16 +475,69 @@
     });
   }
 
+  /* ---------- licznik czasu (działa po wyjściu z aplikacji: liczy od zapisanej godziny startu) ---------- */
+  const TIMER_KEY = 'hbtrack.timer';
+  const readTimer = () => { try { return JSON.parse(localStorage.getItem(TIMER_KEY)); } catch (_) { return null; } };
+  let timer = readTimer(), timerInt = null;
+  const timeUnit = h => h.type === 'num' ? (/^(min|minut[ay]?)$/i.test(h.unit) ? 60 : /^(h|godz.?|godzin[ay]?)$/i.test(h.unit) ? 3600 : 0) : 0;
+  const timerLeft = () => timer ? Math.max(0, timer.seconds - (Date.now() - timer.startedAt) / 1000) : 0;
+  const fmtLeft = sec => { const s = Math.ceil(sec), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + pad(mm) : mm) + ':' + pad(ss); };
+  function startTimer(h) {
+    if (timer) stopTimer(false);
+    const k = todayKey(), unit = timeUnit(h), base = getVal(h, k) || 0, need = Math.round((h.target - base) * unit);
+    if (!unit || need <= 0) return;
+    timer = { hid: h.id, k, startedAt: Date.now(), seconds: need, base, unit };
+    try { localStorage.setItem(TIMER_KEY, JSON.stringify(timer)); } catch (_) { }
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => { });
+    render(); tickTimer(true);
+  }
+  // finish=true: cel osiągnięty; false: stop wcześniej — dopisuje przeliczony czas
+  function stopTimer(finish) {
+    if (!timer) return;
+    const t = timer; timer = null; clearInterval(timerInt); timerInt = null;
+    try { localStorage.removeItem(TIMER_KEY); } catch (_) { }
+    const h = state.habits.find(x => x.id === t.hid); if (!h) { render(); return; }
+    if (finish) {
+      setVal(h, t.k, h.target); justCell = { h: h.id, k: t.k };
+      navigator.vibrate?.([80, 60, 80]);
+      toast(`${h.name}: zrobione`);
+      if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification("Grochu's tracker", { body: `${h.name}: czas minął — zrobione ✓`, icon: 'icons/icon-192.png' }); } catch (_) { } }
+    } else {
+      const done = Math.min(t.seconds, (Date.now() - t.startedAt) / 1000), add = t.unit === 60 ? Math.round(done / 60) : Math.round(done / 3600 * 100) / 100; // minuty w całościach, godziny do 0,01
+      if (add > 0) { setVal(h, t.k, Math.min(h.target, +(t.base + add).toFixed(2))); justCell = { h: h.id, k: t.k }; }
+    }
+    render();
+  }
+  function tickTimer(start) {
+    if (!timer) { $('timer-card').hidden = true; return; }
+    if (timer.k !== todayKey()) { stopTimer(false); return; } // licznik z poprzedniego dnia: zapisz, co było
+    const left = timerLeft();
+    if (left <= 0) { stopTimer(true); return; }
+    document.querySelectorAll('[data-timer-left]').forEach(el => { el.textContent = fmtLeft(left); });
+    const bar = document.querySelector('#timer-card .tbar i'); if (bar) bar.style.width = (100 - left / timer.seconds * 100) + '%';
+    if (start && !timerInt) timerInt = setInterval(() => tickTimer(false), 1000);
+  }
+  function renderTimerCard() {
+    const card = $('timer-card');
+    if (!timer || view !== 'week') { card.hidden = true; return; }
+    const h = state.habits.find(x => x.id === timer.hid); if (!h) { card.hidden = true; return; }
+    card.hidden = false;
+    card.innerHTML = `<div class="tinfo"><b>${esc(h.name)}</b><small>cel ${nf(h.target)} ${esc(h.unit)}</small></div><div class="ttime" data-timer-left>${fmtLeft(timerLeft())}</div><button class="tstop" data-timer-stop>${STOP} Stop</button><div class="tbar"><i style="width:${100 - timerLeft() / timer.seconds * 100}%"></i></div>`;
+  }
+
   /* ---------- zdarzenia ---------- */
   document.addEventListener('click', e => {
     const c = e.target.closest('.ob'); if (c && !c.disabled) {
       const h = state.habits.find(x => x.id === c.dataset.h);
+      if (timer && timer.hid === h.id) stopTimer(false);
       // tak/nie: klik przełącza tylko zrobione ↔ puste
       if (h.type === 'bool') { setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; render(); }
       else openEditor(h.id, c.dataset.k);
       return;
     }
     const nt = e.target.closest('[data-note]'); if (nt) { openNote(nt.dataset.note); return; }
+    const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
+    if (e.target.closest('[data-timer-stop]')) { stopTimer(false); return; }
     const more = e.target.closest('[data-more]');
     if (more) { rowMenu = more.dataset.more; render(); document.querySelector(`[data-edit="${rowMenu}"]`)?.focus(); return; }
     const ed = e.target.closest('[data-edit]'); if (ed) { rowMenu = null; render(); openHabitForm(ed.dataset.edit); return; }
@@ -518,7 +580,7 @@
     if (e.key === 'ArrowLeft') step(-1);
     if (e.key === 'ArrowRight') step(1);
   });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && !checkDayChange()) render(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (!checkDayChange()) render(); tickTimer(true); } });
   window.addEventListener('focus', checkDayChange);
   mq.addEventListener('change', () => {
     // przy przejściu na telefon pokaż dziś, jeśli jest w oglądanym tygodniu, inaczej poniedziałek
@@ -652,6 +714,7 @@
   }
 
   render();
+  tickTimer(true); // licznik z poprzedniego uruchomienia: dokończ albo wznów
   scheduleMidnight();
 
   /* ---------- konto i synchronizacja (js/cloud.js) ---------- */
