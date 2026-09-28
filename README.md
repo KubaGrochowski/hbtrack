@@ -1,4 +1,4 @@
-# Tygodnik
+# Grochu's tracker
 
 Tygodniowy tracker nawyków. Czysty HTML/CSS/JS, bez budowania i bez zależności.
 Wymaga konta (e-mail + hasło); dane synchronizują się między urządzeniami przez Supabase i są też trzymane lokalnie, więc aplikacja działa offline.

@@ -1,4 +1,4 @@
-/* Tygodnik — tygodniowy tracker nawyków. Dane zapisywane lokalnie w przeglądarce (localStorage). */
+/* Grochu's tracker — tygodniowy tracker nawyków. Dane zapisywane lokalnie w przeglądarce (localStorage). */
 (() => {
   'use strict';
 

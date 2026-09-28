@@ -1,4 +1,4 @@
-/* Tygodnik — konto i synchronizacja z Supabase (logowanie e-mailem i hasłem).
+/* Grochu's tracker — konto i synchronizacja z Supabase (logowanie e-mailem i hasłem).
    Bez zewnętrznych bibliotek: Supabase Auth (GoTrue) i REST (PostgREST) przez fetch.
 
    Model synchronizacji: stan aplikacji jest spłaszczany do elementów (nawyk, wpis, notatka, kolejność, start).
