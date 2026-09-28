@@ -25,10 +25,10 @@ Po zmianach w plikach aplikacji podbij numer wersji: `VERSION` w `sw.js` oraz `?
 Po wejściu jest ekran z zakładkami „Zaloguj się” / „Załóż konto”; panel pokazuje się dopiero po zalogowaniu. ⋯ w prawym górnym rogu: e-mail konta i „Wyloguj” (z potwierdzeniem).
 
 - Każdy element (nawyk, wpis, notatka, kolejność) ma znacznik czasu zmiany; przy łączeniu wygrywa nowszy, usunięcia też się przenoszą (`js/cloud.js`).
-- Synchronizacja: chwilę po zmianie, po powrocie do aplikacji, po odzyskaniu internetu i co minutę.
+- Synchronizacja na żywo: zmiana wysyła się po 0,3 s, a inne urządzenia dostają ją od razu przez Supabase Realtime (WebSocket). Zapas: przy powrocie do aplikacji, po odzyskaniu internetu i co 20 s.
 - Wylogowanie najpierw wysyła zmiany, potem czyści dane z urządzenia.
 
-W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (każdy widzi tylko swój wiersz), w Authentication wyłączone „Confirm email”. W kodzie jest tylko klucz publiczny (`sb_publishable_…`); kluczy `service_role`/secret nie wolno tu dodawać.
+W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (każdy widzi tylko swój wiersz), dodana do publikacji `supabase_realtime`, w Authentication wyłączone „Confirm email”. W kodzie jest tylko klucz publiczny (`sb_publishable_…`); kluczy `service_role`/secret nie wolno tu dodawać.
 
 ## Obsługa
 

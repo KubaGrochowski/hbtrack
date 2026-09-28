@@ -1,4 +1,4 @@
-/* Grochu's tracker — konto i synchronizacja z Supabase (logowanie e-mailem i hasłem).
+/* Grochu's tracker — konto i synchronizacja z Supabase na żywo (logowanie e-mailem i hasłem, Realtime).
    Bez zewnętrznych bibliotek: Supabase Auth (GoTrue) i REST (PostgREST) przez fetch.
 
    Model synchronizacji: stan aplikacji jest spłaszczany do elementów (nawyk, wpis, notatka, kolejność, start).
@@ -75,6 +75,7 @@
     if (session.expires_at - 60 > Date.now() / 1000) return session.access_token;
     try {
       saveSession(await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh_token } }));
+      wsSend({ topic: 'realtime:hbtrack', event: 'access_token', payload: { access_token: session.access_token } });
       return session.access_token;
     } catch (e) {
       if (e.status >= 400 && e.status < 500) { saveSession(null); emit(); }
@@ -103,7 +104,50 @@
   }
 
   let timer = null, running = null;
-  function schedule(ms = 1200) { clearTimeout(timer); if (session) timer = setTimeout(sync, ms); }
+  function schedule(ms = 300) { clearTimeout(timer); if (session) timer = setTimeout(sync, ms); }
+
+  /* ---------- na żywo: Supabase Realtime (WebSocket, protokół Phoenix) ----------
+     Serwer powiadamia o każdej zmianie wiersza użytkownika w user_data → od razu pobieramy zmiany.
+     Wymaga: alter publication supabase_realtime add table public.user_data; (RLS dalej obowiązuje). */
+  const TOPIC = 'realtime:hbtrack';
+  let ws = null, hb = null, wsRef = 0, wsRetry = 0, wsTimer = null;
+  const wsSend = m => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...m, ref: String(++wsRef) })); };
+  function rtConnect() {
+    if (!session || ws || !('WebSocket' in window)) return;
+    clearTimeout(wsTimer);
+    let sock;
+    try { sock = new WebSocket(`${SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(SUPABASE_KEY)}&vsn=1.0.0`); }
+    catch (_) { return rtRetry(); }
+    ws = sock;
+    sock.onopen = async () => {
+      let tok; try { tok = await token(); } catch (_) { sock.close(); return; }
+      sock.send(JSON.stringify({
+        topic: TOPIC, event: 'phx_join', ref: String(++wsRef), join_ref: '1',
+        payload: { access_token: tok, config: { broadcast: { self: false }, presence: { key: '' }, private: false,
+          postgres_changes: [{ event: '*', schema: 'public', table: 'user_data', filter: `user_id=eq.${session.user_id}` }] } },
+      }));
+      clearInterval(hb);
+      hb = setInterval(() => wsSend({ topic: 'phoenix', event: 'heartbeat', payload: {} }), 25000);
+    };
+    sock.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+      if (m.topic !== TOPIC) return;
+      if (m.event === 'postgres_changes') schedule(0);                                   // zmiana z innego urządzenia
+      else if (m.event === 'phx_reply' && m.payload?.status === 'ok') { wsRetry = 0; schedule(0); } // (ponowne) połączenie: dociągnij to, co mogło umknąć
+      else if (m.event === 'phx_error' || m.event === 'phx_close') sock.close();
+    };
+    sock.onclose = () => { clearInterval(hb); if (ws === sock) { ws = null; rtRetry(); } };
+    sock.onerror = () => { try { sock.close(); } catch (_) { } };
+  }
+  function rtRetry() {
+    if (!session) return;
+    clearTimeout(wsTimer);
+    wsTimer = setTimeout(rtConnect, Math.min(30000, 1000 * 2 ** wsRetry++));
+  }
+  function rtClose() {
+    clearTimeout(wsTimer); clearInterval(hb);
+    if (ws) { const s = ws; ws = null; s.onclose = null; try { s.close(); } catch (_) { } }
+  }
 
   async function sync() {
     if (!session || !app) return;
@@ -150,10 +194,10 @@
     attach(a) {
       app = a;
       if (!read(META_KEY)) trackLocal();
-      if (session) sync();
-      window.addEventListener('online', () => schedule(200));
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(200); });
-      setInterval(() => { if (!document.hidden) schedule(0); }, 60000);
+      if (session) { sync(); rtConnect(); }
+      window.addEventListener('online', () => { schedule(0); rtConnect(); });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) { schedule(0); rtConnect(); } });
+      setInterval(() => { if (!document.hidden) schedule(0); }, 20000); // zapas, gdyby połączenie na żywo nie działało
     },
     // po każdym lokalnym zapisie
     changed() { if (!app) return; trackLocal(); schedule(); },
@@ -161,13 +205,13 @@
     // Logowanie e-mailem i hasłem (potwierdzanie maila jest wyłączone w Supabase, więc konto działa od razu).
     async signIn(email, password) {
       saveSession(await api('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } })); emit();
-      await sync();
+      await sync(); rtConnect();
     },
     async signUp(email, password) {
       const s = await api('/auth/v1/signup', { method: 'POST', body: { email, password } });
       if (!s?.access_token) throw Object.assign(new Error('Konto utworzone, ale wymaga potwierdzenia e-mailem'), { code: 'needs_confirm' });
       saveSession(s); emit();
-      await sync();
+      await sync(); rtConnect();
     },
     // Wylogowanie: najpierw wysyła zmiany; jeśli się nie da, nie wylogowuje (żeby nic nie zginęło).
     async signOut() {
@@ -175,6 +219,7 @@
       await sync();
       if (status !== 'ok') throw new Error('Brak połączenia — najpierw trzeba wysłać zmiany do chmury.');
       try { await api('/auth/v1/logout', { method: 'POST', token: session.access_token }); } catch (_) { }
+      rtClose();
       saveSession(null); write(META_KEY, null);
       status = 'idle'; lastSync = null; emit();
     },
