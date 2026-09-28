@@ -242,9 +242,9 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 
 /* telefon: „+ Nawyk” przyklejony do dołu ekranu */
 @media (max-width:680px){
-  #add-habit{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;height:52px;justify-content:center;font-size:16px;background:var(--ink);color:var(--bg);border:0;box-shadow:0 8px 24px rgba(0,0,0,.6)}
-  #add-habit:hover{background:var(--ink)}
-  #add-habit b{color:var(--bg)}
+  #add-habit{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;height:52px;justify-content:center;font-size:16px;background:var(--bg);color:var(--ink);border:1.5px solid var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.6)}
+  #add-habit:hover{background:var(--bg)}
+  #add-habit b{color:var(--ink)}
   body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
   .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   .auth{min-height:calc(100svh - 124px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
