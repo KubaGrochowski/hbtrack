@@ -201,13 +201,13 @@
       $('week-label').textContent = range;
       showPct(pct(overall() ?? 0));
       const cur = key(dates[0]) <= t && t <= key(end);
-      if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `${DAYS_FULL[dow(new Date())].toLowerCase()} | <em>${a}/${b}</em>`; }
+      if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `<em>${a}/${b}</em>`; }
       else $('today-label').textContent = key(end) < t ? 'miniony tydzień' : 'nadchodzący tydzień';
     }
 
     $('day-head').classList.toggle('single', mobile);
     $('day-head').innerHTML = mobile
-      ? `${navBtn(-1)}<div class="dayname${key(selDay) === t ? ' t' : ''}">${DAYS_FULL[dow(selDay)]}<em>${selDay.getDate()} ${MONTHS_GEN[selDay.getMonth()]}</em></div>${navBtn(1)}`
+      ? `${navBtn(-1)}<div class="dayname${key(selDay) === t ? ' t' : ''}">${DAYS_FULL[dow(selDay)]}<em>, ${selDay.getDate()} ${MONTHS_GEN[selDay.getMonth()]}</em></div>${navBtn(1)}`
       : `<span class="lbl">${navBtn(-1)}</span><div class="o-track">${dates.map(d => { const k = key(d), n = noteOf(k); return `<span class="${k === t ? 't' : ''}"><button class="dh${n ? ' has-note' : ''}" data-note="${k}" aria-label="Notatka: ${DAYS_FULL[dow(d)]} ${d.getDate()}">${DAYS[dow(d)]}<em>${d.getDate()}</em></button></span>`; }).join('')}</div><span class="sp">${navBtn(1)}</span>`;
 
     const hs = habitsActive();
@@ -219,7 +219,7 @@
       noteBox.innerHTML = `<input id="note-input" type="text" maxlength="140" placeholder="Notatka" autocomplete="off" value="${esc(noteOf(key(selDay)))}" data-k="${key(selDay)}">`;
     }
     if (!hs.length) {
-      $('empty').innerHTML = `Nie masz jeszcze nawyków. Kliknij „+ Nawyk”, żeby dodać pierwszy.`;
+      $('empty').innerHTML = `Nie masz jeszcze nawyków. Kliknij „+ Dodaj”, żeby dodać pierwszy.`;
       $('list').innerHTML = '';
       $('view-calendar').innerHTML = '';
       $('view-week').hidden = false;

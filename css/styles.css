@@ -109,10 +109,11 @@ p{margin:0}
   /* telefon: jeden dzień, jedno kółko na nawyk */
   .o-days.single{grid-template-columns:36px 1fr 36px;gap:8px;padding:0 0 12px}
   .o-days.single .navarr{width:36px;height:36px;font-size:20px}
-  .dayname{text-align:center;font:600 15px var(--f-body);color:var(--ink-2);text-transform:none}
-  .dayname em{display:block;font:500 12px var(--f-mono);font-style:normal;color:var(--ink-3);margin-top:6px}
+  .dayname{text-align:center;font:600 15px var(--f-body);color:var(--ink-2);text-transform:none;white-space:nowrap}
+  .dayname em{font:500 15px var(--f-body);font-style:normal;color:var(--ink-3)}
   .dayname.t{color:var(--ink)}
-  .dayname.t em{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:4px}
+  .dayname.t{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:5px}
+  .dayname.t em{color:var(--ink)}
   .o-row{grid-template-columns:1fr auto 28px;gap:12px;padding:12px 14px;align-items:center}
   .o-row .o-track{display:block;height:auto}
   .o-row .ob{width:48px;height:48px;border-radius:50%}

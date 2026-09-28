@@ -34,7 +34,7 @@ W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (k
 
 - Na telefonie nie da się przybliżać ani przesuwać ekranu w bok.
 - Animacje: wejście listy po nawigacji, przesunięcie przy zmianie dnia/tygodnia, „pyknięcie” i rysowany ptaszek przy odhaczeniu, płynny licznik %, okienka i powiadomienia. Wyłączają się przy systemowym „ogranicz ruch”.
-- **+ Nawyk** dodaje nawyk: tak/nie albo liczbowy (cel dzienny, jednostka, krok +/−), z wyborem dni i pory dnia.
+- **+ Dodaj** dodaje nawyk: tak/nie albo liczbowy (cel dzienny, jednostka, krok +/−), z wyborem dni i pory dnia.
 - **⋯ przy nawyku** pokazuje ołówek (edycja) i × (usunięcie).
 - Klik w **kółko** dnia: nawyk liczbowy otwiera edytor wartości, nawyk tak/nie przełącza zrobione ↔ puste.
 - Zakładki **Tydzień / Kalendarz**. Kalendarz pokazuje % zrobionych nawyków w każdym dniu; klik w dzień otwiera jego tydzień.
