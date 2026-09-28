@@ -22,7 +22,7 @@ Po zmianach w plikach aplikacji podbij numer wersji: `VERSION` w `sw.js` oraz `?
 
 ## Konto i synchronizacja (Supabase)
 
-Po wejściu jest ekran z zakładkami „Zaloguj się” / „Załóż konto”; panel pokazuje się dopiero po zalogowaniu. ⋯ w prawym górnym rogu: e-mail konta i „Wyloguj” (z potwierdzeniem).
+Po wejściu jest ekran z zakładkami „Zaloguj się” / „Załóż konto”; panel pokazuje się dopiero po zalogowaniu. Prawy górny róg: na komputerze ⋯ (e-mail konta i „Wyloguj”), na telefonie ☰ (Tydzień, Kalendarz, Wyloguj się). Sesja zostaje na urządzeniu (wylogowanie tylko ręcznie albo gdy Supabase odrzuci sesję); formularz współpracuje z menedżerami haseł.
 
 - Każdy element (nawyk, wpis, notatka, kolejność) ma znacznik czasu zmiany; przy łączeniu wygrywa nowszy, usunięcia też się przenoszą (`js/cloud.js`).
 - Synchronizacja na żywo: zmiana wysyła się po 0,3 s, a inne urządzenia dostają ją od razu przez Supabase Realtime (WebSocket). Zapas: przy powrocie do aplikacji, po odzyskaniu internetu i co 20 s.
@@ -32,6 +32,7 @@ W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (k
 
 ## Obsługa
 
+- Na telefonie nie da się przybliżać ani przesuwać ekranu w bok.
 - **+ Nawyk** dodaje nawyk: tak/nie albo liczbowy (cel dzienny, jednostka, krok +/−), z wyborem dni i pory dnia.
 - **⋯ przy nawyku** pokazuje ołówek (edycja) i × (usunięcie).
 - Klik w **kółko** dnia: nawyk liczbowy otwiera edytor wartości, nawyk tak/nie przełącza zrobione ↔ puste.

@@ -401,15 +401,28 @@
     btn.disabled = true; btn.textContent = '…'; showAuthError('');
     try {
       if (authMode === 'up') await window.Cloud.signUp(email, pass); else await window.Cloud.signIn(email, pass);
-      $('auth-form').reset(); setAuthMode('in');
+      // zapamiętanie e-maila i hasła w menedżerze haseł (Chrome/Android pyta o zapis; Safari rozpoznaje znikający formularz)
+      try { if (window.PasswordCredential) await navigator.credentials.store(new PasswordCredential({ id: email, password: pass, name: email })); } catch (_) { }
       updateGate(); render();
+      setTimeout(() => { $('auth-form').reset(); setAuthMode('in'); }, 1500);
     } catch (err) { showAuthError(authError(err)); }
     finally { btn.disabled = false; btn.textContent = label === '…' ? 'Zaloguj się' : label; }
   });
   // Wylogowanie: najpierw wysyła zmiany, potem czyści dane z urządzenia i wraca do ekranu logowania.
   // ⋯ w prawym górnym rogu: konto (e-mail) i wylogowanie.
+  // Komputer: ⋯ = konto (e-mail) i wylogowanie. Telefon: ☰ = Tydzień, Kalendarz, Wyloguj się.
   $('menu-btn').addEventListener('click', () => {
-    overlay.innerHTML = sheet(esc(window.Cloud?.user?.email || 'Konto'), '', `<button class="primary" id="logout">Wyloguj</button>`, 'Konto');
+    if (isMobile()) {
+      const item = (v, label) => `<button class="nav-item${view === v ? ' on' : ''}" data-go-view="${v}">${label}</button>`;
+      overlay.innerHTML = sheet('Menu', '', `<nav class="navmenu">${item('week', 'Tydzień')}${item('calendar', 'Kalendarz')}<button class="nav-item out" id="logout">Wyloguj się</button></nav>`, 'Menu');
+      overlay.querySelectorAll('[data-go-view]').forEach(b => b.addEventListener('click', () => {
+        const v = b.dataset.goView;
+        if (v === 'calendar' && view !== 'calendar') monthStart = monthOf(selDay);
+        close(); setView(v); window.scrollTo({ top: 0 });
+      }));
+    } else {
+      overlay.innerHTML = sheet(esc(window.Cloud?.user?.email || 'Konto'), '', `<button class="primary" id="logout">Wyloguj</button>`, 'Konto');
+    }
     $('logout').addEventListener('click', confirmLogout);
   });
   function confirmLogout() {
@@ -600,6 +613,10 @@
   list.addEventListener('pointerup', e => endSwipe(e, false));
   list.addEventListener('pointercancel', e => endSwipe(e, true));
   document.addEventListener('click', e => { if (suppressClick) { suppressClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+
+  /* ---------- telefon: bez przybliżania (Safari ignoruje user-scalable=no, więc blokujemy gest szczypania) ---------- */
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
 
   /* ---------- PWA: działanie offline (instalację proponuje sama przeglądarka) ---------- */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {

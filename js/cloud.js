@@ -70,17 +70,27 @@
     session = s && { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), user_id: s.user?.id || session?.user_id, email: s.user?.email || session?.email };
     write(AUTH_KEY, session);
   };
+  // Sesja zostaje na urządzeniu na stałe; token odświeża się sam. Wylogowanie tylko, gdy Supabase jednoznacznie
+  // odrzuci sesję (np. usunięte konto) — nigdy przy braku internetu, limicie zapytań czy błędzie serwera.
+  const SESSION_DEAD = /refresh_token_not_found|refresh_token_already_used|session_not_found|session_expired|user_not_found|invalid refresh token/i;
+  let refreshing = null;
   async function token() {
     if (!session) throw Object.assign(new Error('Niezalogowany'), { status: 401 });
     if (session.expires_at - 60 > Date.now() / 1000) return session.access_token;
-    try {
-      saveSession(await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh_token } }));
-      wsSend({ topic: 'realtime:hbtrack', event: 'access_token', payload: { access_token: session.access_token } });
-      return session.access_token;
-    } catch (e) {
-      if (e.status >= 400 && e.status < 500) { saveSession(null); emit(); }
-      throw e;
+    if (!refreshing) {
+      const rt = session.refresh_token;
+      refreshing = (async () => {
+        try {
+          saveSession(await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: rt } }));
+          wsSend({ topic: 'realtime:hbtrack', event: 'access_token', payload: { access_token: session.access_token } });
+        } catch (e) {
+          if ((e.status === 400 || e.status === 401) && SESSION_DEAD.test(`${e.code} ${e.message}`) && session?.refresh_token === rt) { saveSession(null); emit(); }
+          throw e;
+        } finally { refreshing = null; }
+      })();
     }
+    await refreshing;
+    return session.access_token;
   }
 
   /* ---------- połączenie z aplikacją ---------- */
@@ -194,6 +204,7 @@
     attach(a) {
       app = a;
       if (!read(META_KEY)) trackLocal();
+      navigator.storage?.persist?.().catch(() => { }); // prośba, żeby system nie czyścił danych i sesji
       if (session) { sync(); rtConnect(); }
       window.addEventListener('online', () => { schedule(0); rtConnect(); });
       document.addEventListener('visibilitychange', () => { if (!document.hidden) { schedule(0); rtConnect(); } });
