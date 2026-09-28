@@ -409,14 +409,17 @@
     finally { btn.disabled = false; btn.textContent = label === '…' ? 'Zaloguj się' : label; }
   });
   // Wylogowanie: najpierw wysyła zmiany, potem czyści dane z urządzenia i wraca do ekranu logowania.
-  $('logout').addEventListener('click', async () => {
-    const b = $('logout'); b.disabled = true;
-    try {
-      await window.Cloud.signOut();
-      applyState({ habits: [], entries: {}, notes: {} });
-      updateGate();
-    } catch (err) { toast(err.message); }
-    finally { b.disabled = false; }
+  $('logout').addEventListener('click', () => {
+    overlay.innerHTML = sheet('Czy chcesz się wylogować?', '', `<div class="confirm"><button data-close>Nie</button><button class="yes" id="confirm-logout">Tak</button></div>`);
+    $('confirm-logout').addEventListener('click', async () => {
+      const b = $('confirm-logout'); b.disabled = true;
+      try {
+        await window.Cloud.signOut();
+        close();
+        applyState({ habits: [], entries: {}, notes: {} });
+        updateGate();
+      } catch (err) { close(); toast(err.message); }
+    });
   });
 
   /* ---------- zdarzenia ---------- */
