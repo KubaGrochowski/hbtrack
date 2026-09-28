@@ -173,6 +173,7 @@
     document.querySelectorAll('.vtab[data-view]').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
     $('view-week').hidden = view !== 'week';
     $('view-calendar').hidden = view !== 'calendar';
+    $('add-habit').hidden = view === 'calendar'; // w kalendarzu nawyków się nie dodaje
     if (view === 'calendar') {
       const m = monthPct(monthStart);
       $('week-label').textContent = `${MONTHS_NOM[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
