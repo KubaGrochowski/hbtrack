@@ -29,8 +29,6 @@ p{margin:0}
 .add{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-weight:600;font-size:14px}
 .add:hover{background:var(--surface-3)}
 .add b{font-size:18px;line-height:1;font-weight:600;color:var(--accent)}
-.icon{width:40px;height:40px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:18px;font-weight:700}
-.icon:hover{background:var(--surface-3)}
 .weeknav{display:flex;align-items:center;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px;height:40px}
 .weeknav button{height:32px;min-width:32px;padding:0 10px;border-radius:999px;font-weight:600;font-size:14px;color:var(--ink-2)}
 .weeknav button:hover:not(:disabled){background:var(--surface-3);color:var(--ink)}
@@ -150,7 +148,6 @@ p{margin:0}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label,.field .lab{font-size:13px;font-weight:600;color:var(--ink-2)}
 .field input[type=text],.field input[type=number]{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--radius);padding:10px 12px;font:inherit;width:100%}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:var(--radius);padding:3px;gap:3px}
 .seg label{text-align:center;padding:8px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink-2);position:relative}
@@ -165,10 +162,6 @@ p{margin:0}
 .daypick input:checked+span{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--accent)}
 .daypick input:checked+span::after{box-shadow:none;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
 .daypick input:focus-visible+span{outline:2px solid var(--accent)}
-.menu{display:flex;flex-direction:column;gap:4px}
-.menu button{text-align:left;padding:12px 14px;border-radius:var(--radius);background:var(--surface-2);font-weight:600}
-.menu button:hover{background:var(--surface-3)}
-.menu button small{display:block;font-weight:400;color:var(--ink-3);font-size:12.5px}
 .confirm{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .confirm button{padding:12px;border-radius:var(--radius);font-weight:600;background:var(--surface-2)}
 .confirm .yes{background:var(--miss);color:#000}
@@ -212,14 +205,22 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 .seg.seg4{grid-template-columns:repeat(4,1fr)}
 .seg.seg4 label{font-size:12.5px;padding:8px 2px}
 
-/* konto */
-.acct{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:var(--radius);background:var(--surface-2)}
-.acct div{min-width:0}
-.acct b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.acct small{display:block;color:var(--ink-3);font-size:12.5px}
-.btn-sm{flex:none;padding:7px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--ink-2)}
-.btn-sm:hover:not(:disabled){background:var(--surface-3);color:var(--ink)}
 .lform{display:flex;flex-direction:column;gap:14px}
 .field input[type=email],.field input[type=password]{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--radius);padding:10px 12px;font:inherit;width:100%}
 .primary:disabled{opacity:.6}
-.l-alt{align-self:center}
+
+/* ekran logowania */
+.auth{min-height:100%;display:grid;place-items:center;padding-block:24px}
+.auth-card{width:min(380px,100%);display:flex;flex-direction:column;gap:22px}
+.auth-brand{display:flex;flex-direction:column;align-items:center;gap:12px}
+.auth-brand img{border-radius:14px}
+.auth-brand h1{font-size:28px;font-weight:700;letter-spacing:-.02em}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;margin:0}
+.auth-tabs .vtab{padding:0}
+.auth-err{margin:0;color:var(--miss);font-size:13.5px;text-align:center}
+
+/* konto na dole strony */
+.acct-foot{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:40px;color:var(--ink-3);font-size:13px}
+.acct-foot button{color:var(--ink-2);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.acct-foot button:hover{color:var(--ink)}
+.acct-foot button:disabled{opacity:.5}

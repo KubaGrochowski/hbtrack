@@ -170,7 +170,7 @@
     const atNow = view === 'calendar' ? key(monthStart) === key(monthOf(now))
       : mobile ? key(selDay) === key(now) : key(weekStart) === key(startOfWeek(now));
     $('this-week').closest('.weeknav').hidden = atNow;
-    document.querySelectorAll('.vtab').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
+    document.querySelectorAll('.vtab[data-view]').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
     $('view-week').hidden = view !== 'week';
     $('view-calendar').hidden = view !== 'calendar';
     if (view === 'calendar') {
@@ -359,41 +359,26 @@
     $('confirm-del').addEventListener('click', () => { state.habits = state.habits.filter(x => x.id !== h.id); delete state.entries[h.id]; save(); close(); render(); });
   }
 
-  /* ---------- konto ---------- */
-  const syncLabel = () => {
-    const C = window.Cloud;
-    if (!C?.user) return '';
-    if (C.status === 'syncing') return 'Synchronizacja…';
-    if (C.status === 'offline') return 'Offline — zsynchronizuje się po połączeniu';
-    if (C.status === 'error') return 'Błąd synchronizacji';
-    if (C.lastSync) return `Zsynchronizowano ${pad(C.lastSync.getHours())}:${pad(C.lastSync.getMinutes())}`;
-    return 'Połączono';
-  };
-  const accountBlock = () => window.Cloud?.user
-    ? `<div class="acct"><div><b>${esc(window.Cloud.user.email)}</b><small id="m-sync">${syncLabel()}</small></div><button id="m-logout" class="btn-sm">Wyloguj</button></div>`
-    : `<button id="m-login">Zaloguj się<small>Te same nawyki na telefonie i komputerze</small></button>`;
-
-  function openLogin() {
-    overlay.innerHTML = sheet('Konto', '', `<form id="lform" class="lform">
-      <div class="field"><label for="l-email">E-mail</label><input id="l-email" type="email" required autocomplete="email" inputmode="email" placeholder="ty@przyklad.pl"></div>
-      <div class="field"><label for="l-pass">Hasło</label><input id="l-pass" type="password" required minlength="6" autocomplete="current-password" placeholder="min. 6 znaków"></div>
-      <button class="primary" type="submit" id="l-in">Zaloguj się</button>
-      <button class="btn-sm l-alt" type="button" id="l-up">Załóż konto</button>
-    </form>`);
-    const f = $('lform');
-    const run = async (mode) => {
-      if (!f.reportValidity()) return;
-      const email = $('l-email').value.trim(), pass = $('l-pass').value;
-      const btns = [$('l-in'), $('l-up')]; btns.forEach(b => { b.disabled = true; });
-      const btn = mode === 'up' ? $('l-up') : $('l-in'), label = btn.textContent; btn.textContent = '…';
-      try {
-        if (mode === 'up') await window.Cloud.signUp(email, pass); else await window.Cloud.signIn(email, pass);
-        close(); render(); toast(mode === 'up' ? 'Konto założone' : 'Zalogowano');
-      } catch (err) { btns.forEach(b => { b.disabled = false; }); btn.textContent = label; toast(authError(err)); }
-    };
-    f.addEventListener('submit', e => { e.preventDefault(); run('in'); });
-    $('l-up').addEventListener('click', () => { $('l-pass').setAttribute('autocomplete', 'new-password'); run('up'); });
-    $('l-email').focus();
+  /* ---------- ekran logowania: bez konta nie ma panelu ---------- */
+  let authMode = 'in';
+  function setAuthMode(m) {
+    authMode = m;
+    document.querySelectorAll('[data-auth]').forEach(b => b.setAttribute('aria-selected', b.dataset.auth === m));
+    $('a-pass2-row').hidden = m !== 'up';
+    $('a-pass').setAttribute('autocomplete', m === 'up' ? 'new-password' : 'current-password');
+    $('a-submit').textContent = m === 'up' ? 'Załóż konto' : 'Zaloguj się';
+    showAuthError('');
+  }
+  function showAuthError(msg) { const el = $('auth-err'); el.textContent = msg; el.hidden = !msg; }
+  // Pokazuje ekran logowania albo panel, zależnie od tego, czy jest zalogowane konto.
+  function updateGate() {
+    const logged = !!window.Cloud?.user || !window.Cloud;
+    $('auth').hidden = logged;
+    $('app-main').hidden = !logged;
+    const foot = $('acct-foot');
+    foot.hidden = !window.Cloud?.user;
+    if (window.Cloud?.user) $('acct-email').textContent = window.Cloud.user.email;
+    if (!logged) { close(); if (!document.activeElement?.closest('#auth')) $('a-email').focus(); }
   }
   function authError(err) {
     const m = (err?.message || '').toLowerCase(), c = err?.code || '';
@@ -405,53 +390,32 @@
     if (c === 'email_address_invalid' || m.includes('email')) return 'Sprawdź adres e-mail';
     return 'Nie udało się: ' + (err?.message || 'nieznany błąd');
   }
-
-  function openMenu() {
-    overlay.innerHTML = sheet('Tygodnik', '', `<div class="menu">
-      ${accountBlock()}
-      ${installPrompt ? `<button id="m-install">Zainstaluj aplikację<small>Ikona na ekranie głównym, działa bez internetu</small></button>` : ''}
-      <button id="m-export">Eksportuj kopię (JSON)<small>Pobierz plik ze wszystkimi nawykami i wpisami</small></button>
-      <button id="m-import">Wczytaj kopię<small>Zastąpi obecne dane plikiem JSON</small></button>
-      <button id="m-reset">Wyczyść wszystko<small>${window.Cloud?.user ? 'Usuwa nawyki i wpisy, także z konta' : 'Usuwa nawyki i wpisy z tej przeglądarki'}</small></button>
-    </div><input type="file" id="m-file" accept="application/json" hidden>`);
-    $('m-login')?.addEventListener('click', openLogin);
-    $('m-logout')?.addEventListener('click', async () => {
-      const b = $('m-logout'); b.disabled = true; b.textContent = '…';
-      try {
-        await window.Cloud.signOut();
-        applyState({ habits: [], entries: {}, notes: {} });
-        close(); toast('Wylogowano');
-      } catch (err) { b.disabled = false; b.textContent = 'Wyloguj'; toast(err.message); }
-    });
-    $('m-install')?.addEventListener('click', async () => {
-      close();
-      const p = installPrompt; installPrompt = null;
-      p.prompt();
-      await p.userChoice.catch(() => { });
-    });
-    $('m-export').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tygodnik-${todayKey()}.json`; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000); close(); toast('Kopia pobrana');
-    });
-    $('m-import').addEventListener('click', () => $('m-file').click());
-    $('m-file').addEventListener('change', e => {
-      const file = e.target.files[0]; if (!file) return;
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          const s = JSON.parse(r.result);
-          if (!s || !Array.isArray(s.habits) || typeof s.entries !== 'object') throw 0;
-          state = withStart(s); save(); close(); render(); toast('Wczytano kopię');
-        } catch (_) { toast('To nie jest poprawny plik kopii'); }
-      };
-      r.readAsText(file);
-    });
-    $('m-reset').addEventListener('click', () => {
-      overlay.innerHTML = sheet('Wyczyścić wszystko?', '', `<p style="color:var(--ink-2)">Nawyki i wszystkie wpisy zostaną trwale usunięte z tej przeglądarki.</p><div class="confirm"><button data-close>Anuluj</button><button class="yes" id="confirm-reset">Wyczyść</button></div>`);
-      $('confirm-reset').addEventListener('click', () => { state = withStart({ habits: [], entries: {} }); save(); close(); render(); toast('Wyczyszczono'); });
-    });
-  }
+  document.querySelectorAll('[data-auth]').forEach(b => b.addEventListener('click', () => setAuthMode(b.dataset.auth)));
+  $('auth-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = $('a-email').value.trim(), pass = $('a-pass').value, pass2 = $('a-pass2').value;
+    if (!/^\S+@\S+\.\S+$/.test(email)) return showAuthError('Sprawdź adres e-mail');
+    if (pass.length < 6) return showAuthError('Hasło musi mieć co najmniej 6 znaków');
+    if (authMode === 'up' && pass !== pass2) return showAuthError('Hasła nie są takie same');
+    const btn = $('a-submit'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = '…'; showAuthError('');
+    try {
+      if (authMode === 'up') await window.Cloud.signUp(email, pass); else await window.Cloud.signIn(email, pass);
+      $('auth-form').reset(); setAuthMode('in');
+      updateGate(); render();
+    } catch (err) { showAuthError(authError(err)); }
+    finally { btn.disabled = false; btn.textContent = label === '…' ? 'Zaloguj się' : label; }
+  });
+  // Wylogowanie: najpierw wysyła zmiany, potem czyści dane z urządzenia i wraca do ekranu logowania.
+  $('logout').addEventListener('click', async () => {
+    const b = $('logout'); b.disabled = true;
+    try {
+      await window.Cloud.signOut();
+      applyState({ habits: [], entries: {}, notes: {} });
+      updateGate();
+    } catch (err) { toast(err.message); }
+    finally { b.disabled = false; }
+  });
 
   function seed() {
     const c = todayKey();
@@ -481,7 +445,7 @@
     const ed = e.target.closest('[data-edit]'); if (ed) { rowMenu = null; render(); openHabitForm(ed.dataset.edit); return; }
     const dl = e.target.closest('[data-del]'); if (dl) { rowMenu = null; render(); confirmDelete(dl.dataset.del); return; }
     if (rowMenu && !e.target.closest('.racts') && !e.target.closest('#overlay')) { rowMenu = null; render(); }
-    const vt = e.target.closest('.vtab');
+    const vt = e.target.closest('.vtab[data-view]');
     if (vt) {
       if (vt.dataset.view === 'calendar' && view !== 'calendar') {
         // z bieżącego tygodnia (lub dnia na telefonie) → bieżący miesiąc; z innego tygodnia → miesiąc, w którym leży jego większość
@@ -494,7 +458,6 @@
     const go = e.target.closest('[data-goto]');
     if (go && !go.disabled) { const g = fromKey(go.dataset.goto); weekStart = g < fromKey(state.start) ? fromKey(state.start) : g; if (go.dataset.day) selDay = fromKey(go.dataset.day); setView('week'); window.scrollTo({ top: 0 }); return; }
     if (e.target.closest('#add-habit')) { openHabitForm(null); return; }
-    if (e.target.closest('#menu-btn')) { openMenu(); return; }
     if (e.target.closest('#seed')) { seed(); return; }
     const nav = e.target.closest('[data-nav]'); if (nav) { if (!nav.disabled) step(+nav.dataset.nav); return; }
     if (e.target.closest('#this-week')) { selDay = dayOnly(new Date()); weekStart = startOfWeek(new Date()); monthStart = monthOf(new Date()); render(); }
@@ -644,10 +607,7 @@
   list.addEventListener('pointercancel', e => endSwipe(e, true));
   document.addEventListener('click', e => { if (suppressClick) { suppressClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
 
-  /* ---------- PWA: działanie offline i instalacja ---------- */
-  let installPrompt = null;
-  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; });
-  window.addEventListener('appinstalled', () => { installPrompt = null; });
+  /* ---------- PWA: działanie offline (instalację proponuje sama przeglądarka) ---------- */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));
   }
@@ -656,8 +616,11 @@
   scheduleMidnight();
 
   /* ---------- konto i synchronizacja (js/cloud.js) ---------- */
+  updateGate();
   if (window.Cloud) {
-    window.Cloud.onChange(() => { const el = $('m-sync'); if (el) el.textContent = syncLabel(); });
+    let wasLogged = !!window.Cloud.user;
+    // np. wygasła sesja → powrót do ekranu logowania
+    window.Cloud.onChange(() => { const now = !!window.Cloud.user; if (now !== wasLogged) { wasLogged = now; updateGate(); } });
     window.Cloud.attach({ getState: () => state, applyState });
   }
 })();

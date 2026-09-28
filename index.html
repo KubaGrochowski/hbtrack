@@ -19,7 +19,24 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<main class="wrap">
+<section class="auth" id="auth" hidden>
+  <div class="auth-card">
+    <div class="auth-brand"><img src="icons/icon-192.png" alt="" width="56" height="56"><h1>Tygodnik</h1></div>
+    <nav class="vtabs auth-tabs" role="tablist" aria-label="Konto">
+      <button class="vtab" role="tab" data-auth="in" aria-selected="true">Zaloguj się</button>
+      <button class="vtab" role="tab" data-auth="up" aria-selected="false">Załóż konto</button>
+    </nav>
+    <form id="auth-form" class="lform" novalidate>
+      <div class="field"><label for="a-email">E-mail</label><input id="a-email" type="email" required autocomplete="email" inputmode="email" placeholder="ty@przyklad.pl"></div>
+      <div class="field"><label for="a-pass">Hasło</label><input id="a-pass" type="password" required minlength="6" autocomplete="current-password" placeholder="min. 6 znaków"></div>
+      <div class="field" id="a-pass2-row" hidden><label for="a-pass2">Powtórz hasło</label><input id="a-pass2" type="password" minlength="6" autocomplete="new-password"></div>
+      <p class="auth-err" id="auth-err" role="alert" hidden></p>
+      <button class="primary" type="submit" id="a-submit">Zaloguj się</button>
+    </form>
+  </div>
+</section>
+
+<main class="wrap" id="app-main">
   <header class="top">
     <div>
       <div class="eyebrow" id="week-label"></div>
@@ -30,7 +47,6 @@
         <button id="this-week">Dziś</button>
       </div>
       <button class="add" id="add-habit"><b>+</b>Nawyk</button>
-      <button class="icon" id="menu-btn" aria-label="Więcej">⋯</button>
     </div>
   </header>
 
@@ -46,6 +62,7 @@
   </section>
   <section id="view-calendar" hidden></section>
   <p class="empty" id="empty" hidden></p>
+  <footer class="acct-foot" id="acct-foot" hidden><span id="acct-email"></span><button id="logout">Wyloguj</button></footer>
 </main>
 
 <div id="overlay"></div>

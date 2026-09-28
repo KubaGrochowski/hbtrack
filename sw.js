@@ -1,5 +1,5 @@
 /* Tygodnik — service worker: aplikacja działa offline. Dane nawyków nie są tu przechowywane (zostają w localStorage). */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `tygodnik-${VERSION}`;
 const SHELL = [
   './',
