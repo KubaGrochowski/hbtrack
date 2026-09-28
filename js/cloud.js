@@ -36,7 +36,9 @@
     });
     return { start: items.start, habits: order.map(id => habitsById[id]), entries, notes };
   }
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // Porównanie niezależne od kolejności kluczy (inaczej te same dane uchodziły za różne i synchronizacja kręciła się w kółko).
+  const canon = v => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
+  const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 
   // Łączenie dwóch dokumentów {items, ts}: dla każdego klucza wygrywa nowszy znacznik (remis → chmura).
   function merge(local, remote) {
@@ -113,7 +115,7 @@
     write(META_KEY, m);
   }
 
-  let timer = null, running = null;
+  let timer = null, running = null, localVersion = 0;
   function schedule(ms = 300) { clearTimeout(timer); if (session) timer = setTimeout(sync, ms); }
 
   /* ---------- na żywo: Supabase Realtime (WebSocket, protokół Phoenix) ----------
@@ -166,23 +168,28 @@
       status = 'syncing'; emit();
       try {
         const tok = await token();
-        trackLocal();
-        const m = meta();
         const rows = await api('/rest/v1/user_data?select=data', { token: tok });
         const remote = rows?.[0]?.data?.items ? rows[0].data : { items: {}, ts: {} };
+        // Stan lokalny czytamy dopiero PO pobraniu z chmury, żeby objąć kliknięcia z czasu pobierania.
+        trackLocal();
+        const m = meta();
         const local = { items: m.flat, ts: m.ts };
         const merged = merge(local, remote);
         if (!same(merged.items, local.items)) {
           app.applyState(unflatten(merged.items)); // nadpisuje stan aplikacji bez oznaczania zmian jako lokalnych
         }
-        if (!same(merged, remote)) {
+        const needPush = !same(merged, remote);
+        write(META_KEY, { flat: merged.items, ts: merged.ts, dirty: needPush });
+        const v = localVersion;
+        if (needPush) {
           await api('/rest/v1/user_data?on_conflict=user_id', {
             method: 'POST', token: tok,
             headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
             body: { user_id: session.user_id, data: merged, updated_at: new Date().toISOString() },
           });
         }
-        write(META_KEY, { flat: merged.items, ts: merged.ts, dirty: false });
+        // Zmiany zrobione w trakcie wysyłki zostały już zapisane w META przez changed() — nie nadpisujemy ich, tylko dosyłamy.
+        if (localVersion === v) write(META_KEY, { ...meta(), dirty: false }); else schedule(0);
         status = 'ok'; lastSync = new Date(); lastError = '';
       } catch (e) {
         status = navigator.onLine === false || e instanceof TypeError ? 'offline' : 'error';
@@ -211,7 +218,7 @@
       setInterval(() => { if (!document.hidden) schedule(0); }, 20000); // zapas, gdyby połączenie na żywo nie działało
     },
     // po każdym lokalnym zapisie
-    changed() { if (!app) return; trackLocal(); schedule(); },
+    changed() { if (!app) return; localVersion++; trackLocal(); schedule(); },
 
     // Logowanie e-mailem i hasłem (potwierdzanie maila jest wyłączone w Supabase, więc konto działa od razu).
     async signIn(email, password) {
