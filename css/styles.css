@@ -218,8 +218,6 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 .auth-tabs .vtab{padding:0}
 .auth-err{margin:0;color:var(--miss);font-size:13.5px;text-align:center}
 
-/* konto na dole strony */
-.acct-foot{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:40px;padding-bottom:48px;color:var(--ink-3);font-size:13px}
-.acct-foot button{color:var(--ink-2);font-weight:600;text-decoration:underline;text-underline-offset:3px}
-.acct-foot button:hover{color:var(--ink)}
-.acct-foot button:disabled{opacity:.5}
+.icon{width:40px;height:40px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-2)}
+.icon:hover{background:var(--surface-3);color:var(--ink)}
+@media (max-width:680px){.top{position:relative}#menu-btn{position:absolute;top:-6px;right:0}}

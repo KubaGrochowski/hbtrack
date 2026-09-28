@@ -182,7 +182,7 @@
       $('week-label').textContent = range;
       $('week-pct').textContent = pct(overall() ?? 0) + '%';
       const cur = key(dates[0]) <= t && t <= key(end);
-      if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `dziś <em>${a}/${b}</em> · ${DAYS_FULL[dow(new Date())].toLowerCase()}`; }
+      if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `${DAYS_FULL[dow(new Date())].toLowerCase()} | <em>${a}/${b}</em>`; }
       else $('today-label').textContent = key(end) < t ? 'miniony tydzień' : 'nadchodzący tydzień';
     }
 
@@ -377,9 +377,6 @@
     const logged = !!window.Cloud?.user || !window.Cloud;
     $('auth').hidden = logged;
     $('app-main').hidden = !logged;
-    const foot = $('acct-foot');
-    foot.hidden = !window.Cloud?.user;
-    if (window.Cloud?.user) $('acct-email').textContent = window.Cloud.user.email;
     if (!logged) { close(); if (!document.activeElement?.closest('#auth')) $('a-email').focus(); }
   }
   function authError(err) {
@@ -409,7 +406,12 @@
     finally { btn.disabled = false; btn.textContent = label === '…' ? 'Zaloguj się' : label; }
   });
   // Wylogowanie: najpierw wysyła zmiany, potem czyści dane z urządzenia i wraca do ekranu logowania.
-  $('logout').addEventListener('click', () => {
+  // ⋯ w prawym górnym rogu: konto (e-mail) i wylogowanie.
+  $('menu-btn').addEventListener('click', () => {
+    overlay.innerHTML = sheet(esc(window.Cloud?.user?.email || 'Konto'), '', `<button class="primary" id="logout">Wyloguj</button>`, 'Konto');
+    $('logout').addEventListener('click', confirmLogout);
+  });
+  function confirmLogout() {
     overlay.innerHTML = sheet('Czy chcesz się wylogować?', '', `<div class="confirm"><button data-close>Nie</button><button class="yes" id="confirm-logout">Tak</button></div>`);
     $('confirm-logout').addEventListener('click', async () => {
       const b = $('confirm-logout'); b.disabled = true;
@@ -420,7 +422,7 @@
         updateGate();
       } catch (err) { close(); toast(err.message); }
     });
-  });
+  }
 
   /* ---------- zdarzenia ---------- */
   document.addEventListener('click', e => {

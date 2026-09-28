@@ -22,7 +22,7 @@ Po zmianach w plikach aplikacji podbij numer wersji: `VERSION` w `sw.js` oraz `?
 
 ## Konto i synchronizacja (Supabase)
 
-Po wejściu jest ekran z zakładkami „Zaloguj się” / „Załóż konto”; panel pokazuje się dopiero po zalogowaniu. Na dole strony: e-mail i „Wyloguj”.
+Po wejściu jest ekran z zakładkami „Zaloguj się” / „Załóż konto”; panel pokazuje się dopiero po zalogowaniu. ⋯ w prawym górnym rogu: e-mail konta i „Wyloguj” (z potwierdzeniem).
 
 - Każdy element (nawyk, wpis, notatka, kolejność) ma znacznik czasu zmiany; przy łączeniu wygrywa nowszy, usunięcia też się przenoszą (`js/cloud.js`).
 - Synchronizacja: chwilę po zmianie, po powrocie do aplikacji, po odzyskaniu internetu i co minutę.
