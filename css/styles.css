@@ -87,7 +87,6 @@ p{margin:0}
 .o-list{display:flex;flex-direction:column;gap:6px}
 .o-row{align-items:center;padding:14px 18px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line)}
 .o-row .name{text-align:left;min-width:0}
-.o-row .name:hover b{color:var(--accent)}
 .o-row b{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px;min-width:0}
 .o-row b .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .o-row small{color:var(--ink-3);font-size:12.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -96,8 +95,8 @@ p{margin:0}
 .ob:hover:not(:disabled){background:var(--surface-2)}
 .c{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;position:relative}
 .c.done{background:var(--accent);color:#000}
-.c.part{background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--surface-3) 0)}
-.c.part::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--surface)}
+.c.part{background:var(--surface-2);overflow:hidden;isolation:isolate}
+.c.part::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 45%,var(--surface-3))}
 .c.miss{box-shadow:inset 0 0 0 2px var(--surface-3)}
 .c.miss::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--miss)}
 .c.pending{box-shadow:inset 0 0 0 2px var(--ink-3)}
@@ -415,3 +414,26 @@ button:not(:disabled):active{transform:scale(.96)}
 .o-row.od.sk .odtag{opacity:.75}
 .odr{color:var(--ink-2)}
 .odr:hover{color:var(--accent)}
+
+/* woda w kółku nawyku liczbowego: poziom = % celu, fala się kołysze */
+.c .wv{position:absolute;left:-50%;width:200%;height:200%;top:calc((100 - var(--p))*1%);border-radius:43%;background:var(--accent);z-index:-1;animation:wave 5.5s linear infinite}
+.c .wv.b{background:color-mix(in srgb,var(--accent) 45%,transparent);border-radius:40%;margin-top:-3px;animation-duration:8s;animation-direction:reverse}
+@keyframes wave{to{transform:rotate(360deg)}}
+
+/* iskry przy odhaczeniu */
+.spark{position:fixed;border-radius:50%;background:var(--accent);pointer-events:none;z-index:50;box-shadow:0 0 6px rgba(74,222,128,.7)}
+
+/* domknięcie dnia: procent podskakuje od lewej krawędzi */
+#week-pct{transform-origin:0 80%}
+
+/* płomień serii rośnie na progach 7 / 14 / 30 dni */
+.streak svg{transform-origin:50% 90%;transition:transform .3s var(--ease)}
+.streak.t1{gap:4px}
+.streak.t1 svg{transform:scale(1.2);filter:drop-shadow(0 0 3px rgba(251,146,60,.55))}
+.streak.t2{gap:5px}
+.streak.t2 svg{transform:scale(1.38);filter:drop-shadow(0 0 5px rgba(251,146,60,.75))}
+.streak.t3{gap:6px;color:#FDBA74}
+.streak.t3 svg{transform:scale(1.55);filter:drop-shadow(0 0 7px rgba(251,146,60,.9));animation:flicker 1.8s ease-in-out infinite}
+@keyframes flicker{0%,100%{transform:scale(1.55) rotate(-3deg)}50%{transform:scale(1.64) rotate(3deg)}}
+.streak.flare svg{animation:flare .9s var(--ease)}
+@keyframes flare{0%{transform:scale(1)}35%{transform:scale(2.3);filter:drop-shadow(0 0 12px #FB923C) brightness(1.5)}}

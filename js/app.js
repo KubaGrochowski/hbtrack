@@ -45,6 +45,9 @@
   let selDay = dayOnly(new Date());
   // Animacje: wejście listy (po nawigacji), kierunek przesunięcia dnia/tygodnia, ostatnio zmienione kółko.
   let animList = true, slideDir = 0, justCell = null;
+  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const levels = new Map(); // 'idNawyku|data' → poziom wody (%) z poprzedniego rysowania, żeby płynnie przelać do nowego
+  let userAct = false, hero = { k: null, v: null }, party = false, partyLater = false;
   let edit = null;
   let rowMenu = null;
   let view = 'week';
@@ -79,6 +82,7 @@
   function setVal(h, k, v) {
     state.entries[h.id] ??= {};
     if (v == null) delete state.entries[h.id][k]; else state.entries[h.id][k] = v;
+    userAct = true;
     save();
   }
 
@@ -139,6 +143,7 @@
   const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
   const CLOCK = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const STOP = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="currentColor"/></svg>';
+  const WATER = '<i class="wv"></i><i class="wv b"></i>';
   const FLAME = '<svg width="11" height="13" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 .5c.4 2.4 3.8 3.9 3.8 7.6a3.8 3.8 0 0 1-7.6 0c0-1.5.8-2.6 1.6-3.3.1 1.2.7 2 1.5 2.3C5 5.1 5.1 2.6 6 .5z" fill="currentColor"/></svg>';
 
   /* ---------- kalendarz ---------- */
@@ -276,6 +281,10 @@
       const day = mobile ? selDay : dayOnly(new Date());
       const dp = dayPct(day), [a, b] = dayDone(day);
       showPct(dp == null ? (key(day) > t ? null : 0) : pct(dp));
+      const hv = dp == null ? null : pct(dp);
+      if (userAct && hero.k === key(day) && hero.v != null && hero.v < 100 && hv === 100) party = true;
+      if (hv !== 100) partyLater = false;
+      hero = { k: key(day), v: hv };
       $('today-label').innerHTML = `<em>${a}/${b}</em>`;
     }
 
@@ -331,13 +340,14 @@
     if (slideDir || animList) void vw.offsetWidth; // wymusza restart animacji
     if (slideDir) vw.classList.add(slideDir > 0 ? 'slide-l' : 'slide-r'); else if (animList) listEl.classList.add('enter');
     listEl.innerHTML = html;
+    afterList(listEl);
     animList = false; slideDir = 0; justCell = null;
     renderTimerCard();
 
     function odRowHtml({ h, d, k, age }) {
       const idx = rowIdx++, s = status(h, d), v = getVal(h, k), yKey = k, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
       const sub = h.type === 'num' ? `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}` : 'nie zrobione';
-      return `<div class="o-row od${age === 2 ? ' old' : ''}" data-fk="od:${h.id}|${k}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
+      return `<div class="o-row od${age === 2 ? ' old' : ''}" data-fk="od:${h.id}|${k}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}"${h.type === 'num' ? ` data-lv="${h.id}|${k}"` : ''} style="--p:${pct(prog(h, v))}">${s === 'part' ? WATER : ''}</span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
     }
     function skRowHtml({ h, k, age }) {
       const idx = rowIdx++, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
@@ -349,7 +359,7 @@
         const s = status(h, d), v = getVal(h, key(d));
         const dis = s === 'future' || s === 'off' || s === 'pre';
         const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
-        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}" style="--p:${pct(prog(h, v))}">${s === 'done' ? CHECK : ''}</span></button>`;
+        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
       }).join('');
       const open = rowMenu === h.id;
       const acts = open
@@ -373,7 +383,10 @@
       const sk = streak(h);
       const tl = TIMES.find(([v]) => v === h.time)?.[1];
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
-      const fire = sk >= 2 ? `<span class="streak" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
+      // płomień rośnie na progach 7 / 14 / 30 dni; w dniu przekroczenia progu rozbłyska
+      const tier = sk >= 30 ? 3 : sk >= 14 ? 2 : sk >= 7 ? 1 : 0;
+      const flare = justCell && justCell.h === h.id && [7, 14, 30].includes(sk) && status(h, fromKey(justCell.k)) === 'done';
+      const fire = sk >= 2 ? `<span class="streak${tier ? ' t' + tier : ''}${flare ? ' flare' : ''}" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
       return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" data-fk="h:${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${odTag}${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
     }
   }
@@ -401,6 +414,7 @@
   let noteOpen = false;
   const close = () => {
     overlay.innerHTML = ''; edit = null;
+    if (partyLater) { partyLater = false; setTimeout(celebrate, 120); }
     if (noteOpen) { noteOpen = false; render(); }
   };
   const sheet = (title, sub, body, label) => `<div class="scrim" data-close><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(label || title)}"><div class="sheet-h"><div><h2>${title}</h2>${sub ? `<small>${sub}</small>` : ''}</div><button class="x" data-close aria-label="Zamknij">×</button></div>${body}</div></div>`;
@@ -829,6 +843,51 @@
   list.addEventListener('pointerup', e => endSwipe(e, false));
   list.addEventListener('pointercancel', e => endSwipe(e, true));
   document.addEventListener('click', e => { if (suppressClick) { suppressClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+
+  /* ---------- efekty: dotknięcie kafelka, iskry, domknięcie dnia, woda w kółku ---------- */
+  // Klik w kafelek (poza przyciskami): leciutko rośnie i od razu wraca.
+  list.addEventListener('click', e => {
+    const row = e.target.closest('.o-row');
+    if (!row || e.target.closest('button, input, a, label') || calm()) return;
+    row.animate({ transform: ['scale(1)', 'scale(1.025)', 'scale(1)'] }, { duration: 320, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  });
+  // Iskry z kółka przy odhaczeniu.
+  function sparks(el) {
+    if (calm()) return;
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, n = 10;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + Math.random() * .5, d = r.width * .55 + 8 + Math.random() * 14, s = 3 + Math.random() * 3;
+      const p = document.createElement('i');
+      p.className = 'spark';
+      Object.assign(p.style, { left: cx - s / 2 + 'px', top: cy - s / 2 + 'px', width: s + 'px', height: s + 'px' });
+      document.body.appendChild(p);
+      p.animate({ transform: ['translate(0,0) scale(1)', `translate(${Math.cos(a) * d}px,${Math.sin(a) * d}px) scale(.2)`], opacity: [1, 1, 0] },
+        { duration: 460 + Math.random() * 180, easing: 'cubic-bezier(.2,.7,.3,1)' }).onfinish = () => p.remove();
+    }
+  }
+  // Domknięcie dnia: zielona fala po kafelkach i podskok procentu.
+  function celebrate() {
+    navigator.vibrate?.([15, 60, 25]);
+    if (calm()) return;
+    $('week-pct').animate({ transform: ['scale(1)', 'scale(1.14)', 'scale(.98)', 'scale(1)'], color: ['#fff', '#4ADE80', '#4ADE80', '#fff'] }, { duration: 900, easing: 'ease-out' });
+    const off = 'inset 0 0 0 1px rgba(74,222,128,0), 0 0 0 0 rgba(74,222,128,0)';
+    [...list.querySelectorAll('.o-row[data-id]:not(.is-off)')].forEach((r, i) => r.animate(
+      { boxShadow: [off, 'inset 0 0 0 1px rgba(74,222,128,.9), 0 0 24px 0 rgba(74,222,128,.28)', off], transform: ['none', 'scale(1.015)', 'none'] },
+      { duration: 650, delay: 120 + i * 80, easing: 'ease-out' }));
+  }
+  // Po przebudowie listy: woda przelewa się ze starego poziomu, iskry, ewentualne świętowanie.
+  function afterList(el) {
+    el.querySelectorAll('.c[data-lv]').forEach(c => {
+      const p = +c.style.getPropertyValue('--p'), was = levels.get(c.dataset.lv);
+      levels.set(c.dataset.lv, p);
+      if (was == null || was === p || calm()) return;
+      c.querySelectorAll('.wv').forEach(w => w.animate({ top: [`${100 - was}%`, `${100 - p}%`] }, { duration: 650, easing: 'cubic-bezier(.3,.7,.3,1)' }));
+    });
+    if (justCell) { const c = el.querySelector(`.ob[data-h="${CSS.escape(justCell.h)}"][data-k="${justCell.k}"] .c.done`); if (c) sparks(c); }
+    // przy otwartym edytorze świętowanie czeka na jego zamknięcie
+    if (party) { party = false; if (overlay.firstChild) partyLater = true; else celebrate(); }
+    userAct = false;
+  }
 
   /* ---------- telefon: bez przybliżania (Safari ignoruje user-scalable=no, więc blokujemy gest szczypania) ---------- */
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
