@@ -469,3 +469,18 @@ button:not(:disabled):active{transform:scale(.96)}
 
 .seg.seg3{grid-template-columns:repeat(3,1fr)}
 .field input[readonly]{color:var(--ink-2)}
+
+/* okienko timera: Stop = pauza, × zamyka */
+.tact{display:flex;align-items:center;gap:8px}
+.tclose{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--ink-3);background:var(--surface-2);border:1px solid var(--line)}
+.tclose:hover{color:var(--ink);background:var(--surface-3)}
+.tstop.go{background:var(--accent);color:#04180C;border-color:transparent}
+.tstop.go:hover{background:var(--accent);filter:brightness(1.08)}
+.timer-card{transition:border-color .3s}
+.timer-card .ttime{transition:color .3s}
+.timer-card.paused{border-color:var(--line)}
+.timer-card.paused .ttime{color:var(--ink-2);animation:t-blink 1.8s ease-in-out infinite}
+.timer-card.paused .tbar i{background:var(--ink-3)}
+@keyframes t-blink{50%{opacity:.4}}
+.tact.swap .tstop{animation:check-pop .32s var(--ease)}
+@media (max-width:680px){.timer-card{gap:6px 10px;padding:12px 12px 12px 14px}.timer-card .ttime{font-size:24px}.tstop{padding:0 12px}}

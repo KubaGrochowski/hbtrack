@@ -144,6 +144,7 @@
   const XMARK = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
   const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
   const CLOCK = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const PLAY = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.6v8.8L10.2 6z" fill="currentColor"/></svg>';
   const STOP = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="currentColor"/></svg>';
   // Wysokość wody w kółku tak, żeby zalana POWIERZCHNIA koła odpowiadała % celu (90% celu ≈ 84% wysokości, nie prawie pełne).
   const waterLevel = f => {
@@ -633,8 +634,12 @@
   const fmtLeft = sec => { const s = Math.ceil(sec), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + pad(mm) : mm) + ':' + pad(ss); };
   const spentOf = (h, k) => state.spent[h.id + '|' + k] || 0;
   const timerNeed = (h, k) => Math.round((timerGoal(h) - (h.type === 'bool' ? 0 : getVal(h, k) || 0)) * timeUnit(h) - spentOf(h, k));
+  let timerCard = null; // id nawyku, którego zatrzymany timer wciąż widać w okienku
+  let cardRun = null;    // poprzedni stan okienka (odliczanie / pauza) — do animacji przełączenia
+  const timerFull = h => timerGoal(h) * timeUnit(h);
   function startTimer(h) {
-    if (timer) stopTimer(false);
+    if (timer) stopTimer(false, false);
+    timerCard = null;
     const k = todayKey(), unit = timeUnit(h), base = h.type === 'bool' ? 0 : getVal(h, k) || 0, need = timerNeed(h, k);
     if (!unit || need <= 0) return;
     timer = { hid: h.id, k, startedAt: Date.now(), seconds: need, base, unit };
@@ -643,7 +648,8 @@
     render(); tickTimer(true);
   }
   // finish=true: cel osiągnięty; false: stop wcześniej — dopisuje przeliczony czas
-  function stopTimer(finish) {
+  // keep: po zatrzymaniu okienko zostaje z zapamiętanym czasem (zamyka je tylko ×)
+  function stopTimer(finish, keep = true) {
     if (!timer) return;
     const t = timer; timer = null; clearInterval(timerInt); timerInt = null;
     try { localStorage.removeItem(TIMER_KEY); } catch (_) { }
@@ -662,30 +668,46 @@
       if (rest > 0) state.spent[sk] = rest; else delete state.spent[sk];
       save();
     }
+    timerCard = !finish && keep ? t.hid : null;
     render();
   }
+  function closeTimerCard() {
+    if (timer) stopTimer(false, false);
+    timerCard = null;
+    const card = $('timer-card');
+    if (card.hidden || calm()) { render(); return; }
+    const a = card.animate({ opacity: [1, 0], transform: ['none', 'translateY(-10px) scale(.97)'] }, { duration: 220, easing: 'ease-in', fill: 'forwards' });
+    let done = false;
+    const end = () => { if (done) return; done = true; render(); a.cancel(); };
+    a.onfinish = end; setTimeout(end, 300); // zapas, gdy karta w tle wstrzyma animacje
+  }
   function tickTimer(start) {
-    if (!timer) { $('timer-card').hidden = true; return; }
-    if (timer.k !== todayKey()) { stopTimer(false); return; } // licznik z poprzedniego dnia: zapisz, co było
+    if (!timer) { if (!timerCard) $('timer-card').hidden = true; return; }
+    if (timer.k !== todayKey()) { stopTimer(false, false); return; } // licznik z poprzedniego dnia: zapisz, co było
     const left = timerLeft();
     if (left <= 0) { stopTimer(true); return; }
     document.querySelectorAll('[data-timer-left]').forEach(el => { el.textContent = fmtLeft(left); });
-    const bar = document.querySelector('#timer-card .tbar i'); if (bar) bar.style.width = (100 - left / timer.seconds * 100) + '%';
+    const bar = document.querySelector('#timer-card .tbar i'), th = state.habits.find(x => x.id === timer.hid); if (bar && th) bar.style.width = (100 - left / timerFull(th) * 100) + '%';
     if (start && !timerInt) timerInt = setInterval(() => tickTimer(false), 1000);
   }
   function renderTimerCard() {
     const card = $('timer-card');
-    if (!timer || view !== 'week') { card.hidden = true; return; }
-    const h = state.habits.find(x => x.id === timer.hid); if (!h) { card.hidden = true; return; }
+    const tk = todayKey(), hid = timer ? timer.hid : timerCard, h = hid && state.habits.find(x => x.id === hid);
+    const run = !!timer, left = !h ? 0 : run ? timerLeft() : timerNeed(h, tk);
+    if (!h || (!run && (left <= 0 || !timeUnit(h) || status(h, fromKey(tk)) === 'done'))) { if (!run) timerCard = null; card.hidden = true; cardRun = null; return; }
+    if (view !== 'week') { card.hidden = true; return; }
+    const swap = cardRun !== null && cardRun !== run && !card.hidden; cardRun = run;
     card.hidden = false;
-    card.innerHTML = `<div class="tinfo"><b>${esc(h.name)}</b><small>${h.type === 'bool' ? `${nf(timerGoal(h))} ${timerOf(h)}` : `cel ${nf(h.target)} ${esc(h.unit)}`}</small></div><div class="ttime" data-timer-left>${fmtLeft(timerLeft())}</div><button class="tstop" data-timer-stop>${STOP} Stop</button><div class="tbar"><i style="width:${100 - timerLeft() / timer.seconds * 100}%"></i></div>`;
+    card.classList.toggle('paused', !run);
+    const act = run ? `<button class="tstop" data-timer-stop>${STOP} Stop</button>` : `<button class="tstop go" data-timer="${h.id}">${PLAY} Start</button>`;
+    card.innerHTML = `<div class="tinfo"><b>${esc(h.name)}</b><small>${h.type === 'bool' ? `${nf(timerGoal(h))} ${timerOf(h)}` : `cel ${nf(h.target)} ${esc(h.unit)}`}</small></div><div class="ttime"${run ? ' data-timer-left' : ''}>${fmtLeft(left)}</div><div class="tact${swap ? ' swap' : ''}">${act}<button class="tclose" data-timer-close aria-label="Zamknij">${XMARK}</button></div><div class="tbar"><i style="width:${100 - left / timerFull(h) * 100}%"></i></div>`;
   }
 
   /* ---------- zdarzenia ---------- */
   document.addEventListener('click', e => {
     const c = e.target.closest('.ob'); if (c && !c.disabled) {
       const h = state.habits.find(x => x.id === c.dataset.h);
-      if (timer && timer.hid === h.id) stopTimer(false);
+      if (timer && timer.hid === h.id) { stopTimer(false); return; } // kółko przy działającym timerze = pauza
       // tak/nie: klik przełącza tylko zrobione ↔ puste
       if (h.type === 'bool') { const od = c.hasAttribute('data-od'); setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; if (od) renderSmooth(); else render(); if (od) toast(`Nadrobione: ${h.name}`); }
       else openEditor(h.id, c.dataset.k);
@@ -700,6 +722,7 @@
     const sk = e.target.closest('[data-skip]'); if (sk) { state.skips[sk.dataset.skip] = 1; save(); renderSmooth(); return; }
     const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
     if (e.target.closest('[data-timer-stop]')) { stopTimer(false); return; }
+    if (e.target.closest('[data-timer-close]')) { closeTimerCard(); return; }
     const more = e.target.closest('[data-more]');
     if (more) { rowMenu = more.dataset.more; render(); document.querySelector(`[data-edit="${rowMenu}"]`)?.focus(); return; }
     const ed = e.target.closest('[data-edit]'); if (ed) { rowMenu = null; render(); openHabitForm(ed.dataset.edit); return; }
