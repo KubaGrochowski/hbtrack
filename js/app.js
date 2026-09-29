@@ -28,6 +28,8 @@
     }
     if (!s.notes || typeof s.notes !== 'object') s.notes = {};
     if (!s.skips || typeof s.skips !== 'object') s.skips = {};
+    if (!s.spent || typeof s.spent !== 'object') s.spent = {};
+    Object.keys(s.spent).forEach(k => { if ((k.split('|')[1] || '') < todayKey()) delete s.spent[k]; });
     // odpuszczone zaległości starsze niż tydzień nie są już potrzebne
     const old = key(addDays(new Date(), -7));
     Object.keys(s.skips).forEach(k => { if ((k.split('|')[1] || '') < old) delete s.skips[k]; });
@@ -73,7 +75,7 @@
   }
   // Stan z chmury (po synchronizacji): zapis lokalny bez oznaczania go jako zmiany z tego urządzenia.
   function applyState(s) {
-    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, skips: s.skips || {}, start: s.start });
+    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, skips: s.skips || {}, spent: s.spent || {}, start: s.start });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
     render();
   }
@@ -393,6 +395,7 @@
       const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
         : canTime ? `<button class="tbtn" data-timer="${h.id}" aria-label="Uruchom licznik: ${esc(h.name)}">${CLOCK}</button>` : '';
       if (running) sub = `<span data-timer-left>${fmtLeft(timerLeft())}</span> pozostało`;
+      else if (canTime && h.type === 'bool' && spentOf(h, tk) > 0) sub = `${fmtLeft(timerNeed(h, tk))} pozostało`;
       const sk = streak(h);
       const tl = TIMES.find(([v]) => v === h.time)?.[1];
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
@@ -628,9 +631,11 @@
   const timerGoal = h => h.type === 'bool' ? (h.dur || 0) : h.target;
   const timerLeft = () => timer ? Math.max(0, timer.seconds - (Date.now() - timer.startedAt) / 1000) : 0;
   const fmtLeft = sec => { const s = Math.ceil(sec), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + pad(mm) : mm) + ':' + pad(ss); };
+  const spentOf = (h, k) => state.spent[h.id + '|' + k] || 0;
+  const timerNeed = (h, k) => Math.round((timerGoal(h) - (h.type === 'bool' ? 0 : getVal(h, k) || 0)) * timeUnit(h) - spentOf(h, k));
   function startTimer(h) {
     if (timer) stopTimer(false);
-    const k = todayKey(), unit = timeUnit(h), base = h.type === 'bool' ? 0 : getVal(h, k) || 0, need = Math.round((timerGoal(h) - base) * unit);
+    const k = todayKey(), unit = timeUnit(h), base = h.type === 'bool' ? 0 : getVal(h, k) || 0, need = timerNeed(h, k);
     if (!unit || need <= 0) return;
     timer = { hid: h.id, k, startedAt: Date.now(), seconds: need, base, unit };
     try { localStorage.setItem(TIMER_KEY, JSON.stringify(timer)); } catch (_) { }
@@ -644,13 +649,18 @@
     try { localStorage.removeItem(TIMER_KEY); } catch (_) { }
     const h = state.habits.find(x => x.id === t.hid); if (!h) { render(); return; }
     if (finish) {
+      delete state.spent[h.id + '|' + t.k];
       setVal(h, t.k, h.type === 'bool' ? 1 : h.target); justCell = { h: h.id, k: t.k }; timerDone = h.id;
       navigator.vibrate?.([80, 60, 80]);
       toast(`${h.name}: zrobione`);
       if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification("Grochu's tracker", { body: `${h.name}: czas minął — zrobione ✓`, icon: 'icons/icon-192.png' }); } catch (_) { } }
     } else {
-      const done = Math.min(t.seconds, (Date.now() - t.startedAt) / 1000), add = t.unit === 60 ? Math.round(done / 60) : Math.round(done / 3600 * 100) / 100; // minuty w całościach, godziny do 0,01
-      if (add > 0 && h.type === 'num') { setVal(h, t.k, Math.min(h.target, +(t.base + add).toFixed(2))); justCell = { h: h.id, k: t.k }; }
+      // Stop = pauza: kolejny start liczy od miejsca zatrzymania. Liczbowy: pełne minuty (godziny: co 0,01 h) dopisują się do wartości.
+      const sk = h.id + '|' + t.k, total = Math.min(t.seconds, (Date.now() - t.startedAt) / 1000) + (state.spent[sk] || 0);
+      const q = h.type === 'bool' ? 0 : t.unit === 60 ? 60 : 36, units = q ? Math.floor(total / q + 1e-9) : 0, rest = Math.round(total - units * q);
+      if (units > 0) { setVal(h, t.k, Math.min(h.target, +(t.base + units * (q === 60 ? 1 : .01)).toFixed(2))); justCell = { h: h.id, k: t.k }; }
+      if (rest > 0) state.spent[sk] = rest; else delete state.spent[sk];
+      save();
     }
     render();
   }
