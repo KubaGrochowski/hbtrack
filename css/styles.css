@@ -131,9 +131,11 @@ p{margin:0}
 .x{width:32px;height:32px;border-radius:var(--radius);background:var(--surface-2);font-size:18px;flex:none}
 .ed-val{display:grid;grid-template-columns:52px 1fr 52px;gap:8px;align-items:center}
 .ed-val button{height:52px;border-radius:var(--radius);background:var(--surface-2);border:1px solid var(--line);font-size:24px;font-weight:600}
-.ed-val input{width:100%;text-align:center;font:600 36px var(--f-mono);border:0;background:transparent;color:var(--ink);padding:4px;-moz-appearance:textfield}
+.ed-num{display:flex;justify-content:center;align-items:baseline;gap:8px;min-width:0;cursor:text}
+.ed-val input{text-align:center;font:600 36px var(--f-mono);border:0;background:transparent;color:var(--ink);padding:4px 0;-moz-appearance:textfield;box-sizing:content-box;min-width:1ch;max-width:7ch}
+.ed-val input:focus{outline:0}
+.ed-u{font:600 22px var(--f-mono);color:var(--ink-3)}
 .ed-val input::-webkit-outer-spin-button,.ed-val input::-webkit-inner-spin-button{-webkit-appearance:none}
-.ed-unit{text-align:center;color:var(--ink-3);font-size:13px;margin-top:-8px;font-family:var(--f-mono)}
 .prog{height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden}
 .prog i{display:block;height:100%;background:var(--accent);opacity:.6}
 .prog i.full{opacity:1}

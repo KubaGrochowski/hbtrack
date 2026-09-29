@@ -343,7 +343,8 @@
     let body;
     if (h.type === 'num') {
       const p = prog(h, v);
-      body = `<div class="ed-val"><button data-ed="-" aria-label="Mniej">−</button><input id="ed-input" type="number" inputmode="decimal" step="${h.step}" min="0" value="${v ?? ''}" placeholder="0" aria-label="Wartość"><button data-ed="+" aria-label="Więcej">+</button></div><div class="ed-unit">${esc(h.unit)} · cel ${nf(h.target)}</div><div class="prog"><i class="${p >= 1 ? 'full' : ''}" style="width:${p * 100}%"></i></div><div class="chips"><button data-ed="clear">Wyczyść</button><button data-ed="half">Połowa</button><button data-ed="target">Cel</button></div>`;
+      const w = v => Math.max(1, String(v ?? '').length); // szerokość pola = liczba znaków, żeby jednostka stała tuż za liczbą
+      body = `<div class="ed-val"><button data-ed="-" aria-label="Mniej">−</button><label class="ed-num" for="ed-input"><input id="ed-input" type="number" inputmode="decimal" step="${h.step}" min="0" value="${v ?? ''}" placeholder="0" aria-label="Wartość" style="width:${w(v)}ch">${h.unit ? `<span class="ed-u">${esc(h.unit)}</span>` : ''}</label><button data-ed="+" aria-label="Więcej">+</button></div><div class="prog"><i class="${p >= 1 ? 'full' : ''}" style="width:${p * 100}%"></i></div><div class="chips"><button data-ed="target">Cel: ${nf(h.target)}${h.unit ? ' ' + esc(h.unit) : ''}</button></div>`;
     } else {
       body = `<div class="yn"><button data-ed="yes" class="${v === 1 ? 'sel-done' : ''}">Zrobione</button><button data-ed="no" class="${v === 0 ? 'sel-miss' : ''}">Nie zrobione</button></div><div class="chips"><button data-ed="clear">Wyczyść wpis</button></div>`;
     }
@@ -351,6 +352,7 @@
     const inp = $('ed-input');
     if (inp) {
       inp.addEventListener('input', () => {
+        inp.style.width = Math.max(1, inp.value.length) + 'ch';
         const n = parseFloat(inp.value.replace(',', '.'));
         setVal(h, k, isNaN(n) ? null : Math.max(0, n)); justCell = { h: h.id, k }; render();
         const p = prog(h, getVal(h, k)); const bar = overlay.querySelector('.prog i'); bar.style.width = p * 100 + '%'; bar.classList.toggle('full', p >= 1);
@@ -362,7 +364,7 @@
     if (e.target.hasAttribute('data-close')) { close(); return; }
     const b = e.target.closest('[data-ed]'); if (!b || !edit) return;
     const h = state.habits.find(x => x.id === edit.hid), k = edit.k, a = b.dataset.ed, v = getVal(h, k) || 0;
-    const map = { '+': +(v + h.step).toFixed(2), '-': Math.max(0, +(v - h.step).toFixed(2)), clear: null, half: h.target / 2, target: h.target, yes: 1, no: 0 };
+    const map = { '+': +(v + h.step).toFixed(2), '-': Math.max(0, +(v - h.step).toFixed(2)), clear: null, target: h.target, yes: 1, no: 0 };
     setVal(h, k, map[a]); justCell = { h: h.id, k }; render();
     if (h.type === 'bool' && a !== 'clear') { close(); return; }
     drawEditor();
