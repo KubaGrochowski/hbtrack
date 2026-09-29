@@ -139,12 +139,6 @@
   const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
   const CLOCK = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const STOP = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="currentColor"/></svg>';
-  const damage = new Map(); // id nawyku → { n: liczba kliknięć, t: timer regeneracji, broken }
-  const CRACKS = '<svg class="cracks" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
-    + '<path class="k1" d="M50 0 L48 18 L53 30"/>'
-    + '<path class="k2" d="M53 30 L47 45 L52 58 M48 18 L39 27"/>'
-    + '<path class="k3" d="M52 58 L49 75 L51 100 M47 45 L36 52 M52 58 L63 66"/>'
-    + '<path class="k4" d="M53 30 L66 23 M49 75 L40 86 M63 66 L72 62 M39 27 L33 22 M36 52 L30 60"/></svg>';
   const FLAME = '<svg width="11" height="13" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 .5c.4 2.4 3.8 3.9 3.8 7.6a3.8 3.8 0 0 1-7.6 0c0-1.5.8-2.6 1.6-3.3.1 1.2.7 2 1.5 2.3C5 5.1 5.1 2.6 6 .5z" fill="currentColor"/></svg>';
 
   /* ---------- kalendarz ---------- */
@@ -327,11 +321,11 @@
       hs.forEach(h => { if (['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
     }
     let rowIdx = 0;
-    let html = mobile && overdue.length ? `<div class="grp later od-h">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep"></div>` : '';
+    let html = mobile && overdue.length ? `<div class="grp later od-h" data-fk="g:od">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep" data-fk="g:od-sep"></div>` : '';
     html += onList.map(rowHtml).join('');
-    if (offList.length) html += (onList.length ? `<div class="grp sep"></div>` : '') + offList.map(rowHtml).join('');
-    if (later.length) html += `<div class="grp later">Dodane później</div>` + later.map(rowHtml).join('');
-    if (mobile && skipped.length) html += `<div class="grp later">Odpuszczone</div>` + skipped.map(skRowHtml).join('');
+    if (offList.length) html += (onList.length ? `<div class="grp sep" data-fk="g:off-sep"></div>` : '') + offList.map(rowHtml).join('');
+    if (later.length) html += `<div class="grp later" data-fk="g:later">Dodane później</div>` + later.map(rowHtml).join('');
+    if (mobile && skipped.length) html += `<div class="grp later" data-fk="g:sk">Odpuszczone</div>` + skipped.map(skRowHtml).join('');
     const vw = $('view-week'), listEl = $('list');
     vw.classList.remove('slide-l', 'slide-r'); listEl.classList.remove('enter');
     if (slideDir || animList) void vw.offsetWidth; // wymusza restart animacji
@@ -343,11 +337,11 @@
     function odRowHtml({ h, d, k, age }) {
       const idx = rowIdx++, s = status(h, d), v = getVal(h, k), yKey = k, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
       const sub = h.type === 'num' ? `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}` : 'nie zrobione';
-      return `<div class="o-row od${age === 2 ? ' old' : ''}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
+      return `<div class="o-row od${age === 2 ? ' old' : ''}" data-fk="od:${h.id}|${k}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
     }
     function skRowHtml({ h, k, age }) {
       const idx = rowIdx++, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
-      return `<div class="o-row od sk${age === 2 ? ' old' : ''}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b></div></div><div class="o-track"></div><div class="rmenu"><button class="dots odr" data-unskip="${h.id}|${k}" aria-label="Przywróć: ${esc(h.name)}, ${when}">${UNDO}</button></div></div>`;
+      return `<div class="o-row od sk${age === 2 ? ' old' : ''}" data-fk="od:${h.id}|${k}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b></div></div><div class="o-track"></div><div class="rmenu"><button class="dots odr" data-unskip="${h.id}|${k}" aria-label="Przywróć: ${esc(h.name)}, ${when}">${UNDO}</button></div></div>`;
     }
     function rowHtml(h) {
       const idx = rowIdx++;
@@ -376,12 +370,11 @@
       const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
         : canTime ? `<button class="tbtn" data-timer="${h.id}" aria-label="Uruchom licznik: ${esc(h.name)}">${CLOCK}</button>` : '';
       if (running) sub = `<span data-timer-left>${fmtLeft(timerLeft())}</span> pozostało`;
-      const dm = damage.get(h.id);
       const sk = streak(h);
       const tl = TIMES.find(([v]) => v === h.time)?.[1];
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
       const fire = sk >= 2 ? `<span class="streak" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
-      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}${dm?.broken ? ' broken' : ''}" data-id="${h.id}"${dm ? ` data-dmg="${dm.n}"` : ''} style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${odTag}${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div>${dm ? CRACKS : ''}</div>`;
+      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" data-fk="h:${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${odTag}${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
     }
   }
 
@@ -643,7 +636,7 @@
       const h = state.habits.find(x => x.id === c.dataset.h);
       if (timer && timer.hid === h.id) stopTimer(false);
       // tak/nie: klik przełącza tylko zrobione ↔ puste
-      if (h.type === 'bool') { const od = c.hasAttribute('data-od'); setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; render(); if (od) toast(`Nadrobione: ${h.name}`); }
+      if (h.type === 'bool') { const od = c.hasAttribute('data-od'); setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; if (od) renderSmooth(); else render(); if (od) toast(`Nadrobione: ${h.name}`); }
       else openEditor(h.id, c.dataset.k);
       return;
     }
@@ -652,8 +645,8 @@
     const sm = e.target.closest('[data-sum-mode]');
     if (sm) { sumMode = sm.dataset.sumMode; if (sumMode === 'month') monthStart = monthOf(isMobile() ? selDay : addDays(weekStart, 3)); animList = true; render(); return; }
     const nt = e.target.closest('[data-note]'); if (nt) { openNote(nt.dataset.note); return; }
-    const us = e.target.closest('[data-unskip]'); if (us) { delete state.skips[us.dataset.unskip]; save(); animList = true; render(); return; }
-    const sk = e.target.closest('[data-skip]'); if (sk) { state.skips[sk.dataset.skip] = 1; save(); render(); return; }
+    const us = e.target.closest('[data-unskip]'); if (us) { delete state.skips[us.dataset.unskip]; save(); renderSmooth(); return; }
+    const sk = e.target.closest('[data-skip]'); if (sk) { state.skips[sk.dataset.skip] = 1; save(); renderSmooth(); return; }
     const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
     if (e.target.closest('[data-timer-stop]')) { stopTimer(false); return; }
     const more = e.target.closest('[data-more]');
@@ -692,6 +685,18 @@
     else if (isMobile()) { selDay = addDays(selDay, dir); weekStart = startOfWeek(selDay); slideDir = dir; }
     else { weekStart = addDays(weekStart, 7 * dir); slideDir = dir; }
     render();
+  }
+  // Płynne przejście zamiast przebudowy: elementy listy jadą ze starego miejsca na nowe (FLIP), nowe się wyłaniają.
+  function renderSmooth() {
+    const old = new Map([...list.children].filter(el => el.dataset.fk).map(el => [el.dataset.fk, el.getBoundingClientRect().top]));
+    render();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    [...list.children].forEach(el => {
+      const was = old.get(el.dataset.fk);
+      if (was == null) { el.animate({ opacity: [0, getComputedStyle(el).opacity] }, { duration: 300, easing: 'ease-out' }); return; }
+      const d = was - el.getBoundingClientRect().top;
+      if (d) el.animate({ transform: [`translateY(${d}px)`, 'none'] }, { duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    });
   }
   function setView(v) { if (v === 'summary' && view !== 'summary') sumHabit = null; view = v; rowMenu = null; animList = true; try { localStorage.setItem('hbtrack.view', view); } catch (_) { } render(); }
   document.addEventListener('keydown', e => {
@@ -824,57 +829,6 @@
   list.addEventListener('pointerup', e => endSwipe(e, false));
   list.addEventListener('pointercancel', e => endSwipe(e, true));
   document.addEventListener('click', e => { if (suppressClick) { suppressClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
-
-  /* ---------- zabawa: kafelek pęka po 5 kliknięciach ---------- */
-  // Klik w kafelek (poza przyciskami) dokłada pęknięcia. Piąte kliknięcie: kafelek pęka na pół, połówki spadają,
-  // po sekundzie wraca na miejsce. Mniej niż 5 kliknięć: po chwili sam się regeneruje.
-  // Stan (damage) jest trzymany po id nawyku, więc przetrwa przebudowę listy przez render().
-  const SPLIT_L = 'polygon(0 0, 50% 0, 48% 18%, 53% 30%, 47% 45%, 52% 58%, 49% 75%, 51% 100%, 0 100%)';
-  const SPLIT_R = 'polygon(50% 0, 100% 0, 100% 100%, 51% 100%, 49% 75%, 52% 58%, 47% 45%, 53% 30%, 48% 18%)';
-  const tileOf = id => list.querySelector(`.o-row[data-id="${CSS.escape(id)}"]`);
-  list.addEventListener('click', e => {
-    const row = e.target.closest('.o-row[data-id]');
-    if (!row || e.target.closest('button, input, a, label')) return;
-    const id = row.dataset.id, st = damage.get(id) || { n: 0, t: 0, broken: false };
-    if (st.broken) return;
-    clearTimeout(st.t);
-    st.n++; damage.set(id, st);
-    if (!row.querySelector('.cracks')) row.insertAdjacentHTML('beforeend', CRACKS);
-    row.dataset.dmg = st.n;
-    row.classList.remove('hit', 'healed', 'reborn'); void row.offsetWidth; row.classList.add('hit');
-    navigator.vibrate?.(st.n >= 5 ? [20, 40, 60] : 8);
-    if (st.n >= 5) shatter(id, row, st); else st.t = setTimeout(() => heal(id), 2600);
-  });
-  function heal(id) {
-    damage.delete(id);
-    const row = tileOf(id); if (!row) return;
-    delete row.dataset.dmg;
-    row.classList.remove('hit'); row.classList.add('healed');
-    setTimeout(() => { if (!damage.has(id)) { const r = tileOf(id); r?.classList.remove('healed'); r?.querySelector('.cracks')?.remove(); } }, 700);
-  }
-  function shatter(id, row, st) {
-    st.broken = true;
-    const r = row.getBoundingClientRect();
-    const halves = [[SPLIT_L, 'l'], [SPLIT_R, 'r']].map(([clip, side]) => {
-      const c = row.cloneNode(true);
-      c.className = 'o-row shard ' + side; c.removeAttribute('data-id'); c.setAttribute('aria-hidden', 'true');
-      c.dataset.dmg = 4;
-      Object.assign(c.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', clipPath: clip });
-      document.body.appendChild(c);
-      return c;
-    });
-    row.classList.add('broken');
-    setTimeout(() => halves.forEach(c => c.classList.add('fall')), 30);
-    setTimeout(() => {
-      halves.forEach(c => c.remove());
-      damage.delete(id);
-      const back = tileOf(id); if (!back) return;
-      delete back.dataset.dmg;
-      back.querySelector('.cracks')?.remove();
-      back.classList.remove('broken', 'hit'); back.classList.add('reborn');
-      setTimeout(() => tileOf(id)?.classList.remove('reborn'), 600);
-    }, 900 + 1000); // spadanie + sekunda przerwy
-  }
 
   /* ---------- telefon: bez przybliżania (Safari ignoruje user-scalable=no, więc blokujemy gest szczypania) ---------- */
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
