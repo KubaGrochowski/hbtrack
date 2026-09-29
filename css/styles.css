@@ -437,8 +437,3 @@ button:not(:disabled):active{transform:scale(.96)}
 @keyframes flicker{0%,100%{transform:scale(1.55) rotate(-3deg)}50%{transform:scale(1.64) rotate(3deg)}}
 .streak.flare svg{animation:flare .9s var(--ease)}
 @keyframes flare{0%{transform:scale(1)}35%{transform:scale(2.3);filter:drop-shadow(0 0 12px #FB923C) brightness(1.5)}}
-
-/* nagroda za 100% dnia: fala przez cały ekran */
-.win{position:fixed;inset:0;z-index:70;pointer-events:none;display:grid;place-items:center;overflow:hidden}
-.win-wave{position:absolute;left:-10%;right:-10%;top:0;height:120vh;border-radius:50% 50% 0 0/12vh 12vh 0 0;background:linear-gradient(to top,transparent,rgba(74,222,128,.45) 30%,rgba(74,222,128,.8) 50%,rgba(74,222,128,.45) 70%,transparent);filter:blur(6px)}
-.win-txt{position:relative;font:700 clamp(96px,28vw,200px)/1 var(--f-display);letter-spacing:-.04em;color:#fff;text-shadow:0 0 40px rgba(74,222,128,.9),0 0 90px rgba(74,222,128,.5)}
