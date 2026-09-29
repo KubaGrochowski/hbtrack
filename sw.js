@@ -1,12 +1,12 @@
 /* Grochu's tracker — service worker: aplikacja działa offline. Dane nawyków nie są tu przechowywane (zostają w localStorage). */
-const VERSION = 'v27';
+const VERSION = 'v28';
 const CACHE = `tygodnik-${VERSION}`;
 const SHELL = [
   './',
   'index.html',
-  'css/styles.css?v=27',
-  'js/cloud.js?v=27',
-  'js/app.js?v=27',
+  'css/styles.css?v=28',
+  'js/cloud.js?v=28',
+  'js/app.js?v=28',
   'manifest.webmanifest',
   'icons/favicon.png',
   'icons/icon-192.png',

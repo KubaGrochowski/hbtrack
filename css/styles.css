@@ -225,7 +225,14 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important}
 
 .icon{width:40px;height:40px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-2)}
 .icon:hover{background:var(--surface-3);color:var(--ink)}
-@media (max-width:680px){.top{position:relative}#menu-btn{position:absolute;top:-6px;right:0}}
+/* telefon: menu po lewej, procent po prawej */
+@media (max-width:680px){
+  .top{position:relative;justify-content:flex-end;min-height:64px}
+  .top > div:first-child{text-align:right}
+  .o-hero{flex-direction:row-reverse;justify-content:flex-start}
+  .actions{position:absolute;top:-6px;left:0;flex-wrap:nowrap}
+  #menu-btn{order:-1}
+}
 .allweek{align-self:flex-start;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--ink-2)}
 .allweek:hover{background:var(--surface-2);color:var(--ink)}
 /* telefon: stała wielkość — iPhone przybliża stronę przy polach z czcionką < 16 px */
