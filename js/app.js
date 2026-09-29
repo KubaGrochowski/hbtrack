@@ -134,6 +134,7 @@
   const CHECK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DOTS = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.6" fill="currentColor"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><circle cx="13" cy="8" r="1.6" fill="currentColor"/></svg>';
   const PENCIL = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3L5.5 13.5H2.5v-3l8-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4l3 3" stroke="currentColor" stroke-width="1.6"/></svg>';
+  const UNDO = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6.5h6.5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.8 3.5L2.8 6.5l3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const XMARK = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
   const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
   const CLOCK = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -320,16 +321,17 @@
     // Zaległe z wczoraj: pominięte lub częściowe, nieodpuszczone. Telefon: osobna sekcja na górze dzisiejszego dnia; komputer: plakietka przy nazwie.
     // Sięgają dwa dni wstecz: wczorajsze są pomarańczowe, przedwczorajsze (nienadrobione) czerwone.
     const showOverdue = mobile ? key(selDay) === t : key(dates[0]) <= t && t <= key(end);
-    const overdue = [];
+    const overdue = [], skipped = []; // skipped: odpuszczone krzyżykiem, do przywrócenia z dołu listy
     if (showOverdue) for (const age of [2, 1]) {
       const d = addDays(dayOnly(new Date()), -age), k = key(d);
-      hs.forEach(h => { if (['miss', 'part'].includes(status(h, d)) && !state.skips[h.id + '|' + k]) overdue.push({ h, d, k, age }); });
+      hs.forEach(h => { if (['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
     }
     let rowIdx = 0;
     let html = mobile && overdue.length ? `<div class="grp later od-h">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep"></div>` : '';
     html += onList.map(rowHtml).join('');
     if (offList.length) html += (onList.length ? `<div class="grp sep"></div>` : '') + offList.map(rowHtml).join('');
     if (later.length) html += `<div class="grp later">Dodane później</div>` + later.map(rowHtml).join('');
+    if (mobile && skipped.length) html += `<div class="grp later">Odpuszczone</div>` + skipped.map(skRowHtml).join('');
     const vw = $('view-week'), listEl = $('list');
     vw.classList.remove('slide-l', 'slide-r'); listEl.classList.remove('enter');
     if (slideDir || animList) void vw.offsetWidth; // wymusza restart animacji
@@ -342,6 +344,10 @@
       const idx = rowIdx++, s = status(h, d), v = getVal(h, k), yKey = k, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
       const sub = h.type === 'num' ? `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}` : 'nie zrobione';
       return `<div class="o-row od${age === 2 ? ' old' : ''}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
+    }
+    function skRowHtml({ h, k, age }) {
+      const idx = rowIdx++, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
+      return `<div class="o-row od sk${age === 2 ? ' old' : ''}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b></div></div><div class="o-track"></div><div class="rmenu"><button class="dots odr" data-unskip="${h.id}|${k}" aria-label="Przywróć: ${esc(h.name)}, ${when}">${UNDO}</button></div></div>`;
     }
     function rowHtml(h) {
       const idx = rowIdx++;
@@ -646,6 +652,7 @@
     const sm = e.target.closest('[data-sum-mode]');
     if (sm) { sumMode = sm.dataset.sumMode; if (sumMode === 'month') monthStart = monthOf(isMobile() ? selDay : addDays(weekStart, 3)); animList = true; render(); return; }
     const nt = e.target.closest('[data-note]'); if (nt) { openNote(nt.dataset.note); return; }
+    const us = e.target.closest('[data-unskip]'); if (us) { delete state.skips[us.dataset.unskip]; save(); animList = true; render(); return; }
     const sk = e.target.closest('[data-skip]'); if (sk) { state.skips[sk.dataset.skip] = 1; save(); render(); return; }
     const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
     if (e.target.closest('[data-timer-stop]')) { stopTimer(false); return; }
