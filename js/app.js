@@ -164,42 +164,48 @@
     $('view-calendar').innerHTML = `<section class="panel">${cal}</div></section>`;
   }
 
-  /* ---------- podsumowanie tygodnia ---------- */
+  /* ---------- podsumowanie: wybór nawyku, potem tydzień albo miesiąc ---------- */
+  let sumHabit = null, sumMode = 'week';
+  const sumDates = () => sumMode === 'month' ? monthDays(monthStart) : weekDates();
   function renderSummary() {
-    const dates = weekDates(), t = todayKey();
-    const hs = habitsActive().filter(h => dates.some(d => !['off', 'pre'].includes(status(h, d))));
-    const last = dates[6], rng = dates[0].getMonth() === last.getMonth()
-      ? `${dates[0].getDate()}–${last.getDate()} ${MONTHS_GEN[last.getMonth()]}`
-      : `${dates[0].getDate()} ${MONTHS_GEN[dates[0].getMonth()].slice(0, 3)} – ${last.getDate()} ${MONTHS_GEN[last.getMonth()].slice(0, 3)}`;
+    const t = todayKey(), box = $('view-summary');
+    const h = habitsActive().find(x => x.id === sumHabit);
+    if (!h) {
+      sumHabit = null;
+      box.innerHTML = `<div class="slist${animList ? ' enter' : ''}"><div class="grp later" style="padding-top:0">Wybierz nawyk</div>${habitsActive().map((x, i) => `<button class="sitem" data-sum-habit="${x.id}" style="--i:${i}"><b>${esc(x.name)}</b><small>${tgt(x)}</small><span aria-hidden="true">›</span></button>`).join('')}</div>`;
+      return;
+    }
+    const dates = sumDates(), month = sumMode === 'month', first = dates[0], last = dates[dates.length - 1];
+    const rng = month ? `${MONTHS_NOM[first.getMonth()]} ${first.getFullYear()}`
+      : first.getMonth() === last.getMonth() ? `${first.getDate()}–${last.getDate()} ${MONTHS_GEN[last.getMonth()]}`
+      : `${first.getDate()} ${MONTHS_GEN[first.getMonth()].slice(0, 3)} – ${last.getDate()} ${MONTHS_GEN[last.getMonth()].slice(0, 3)}`;
     const cls = p => p == null ? '' : p >= 0.8 ? 'good' : p >= 0.5 ? 'mid' : 'bad';
-    const dayLbl = d => `<span class="${key(d) === t ? 't' : ''}">${DAYS[dow(d)]}</span>`;
-
-    const numCard = (h, i) => {
-      const rows = dates.map(d => ({ d, s: status(h, d), v: getVal(h, key(d)) }));
+    const lbl = d => `<span class="${key(d) === t ? 't' : ''}">${month ? (d.getDate() === 1 || d.getDate() % 5 === 0 ? d.getDate() : '') : DAYS[dow(d)]}</span>`;
+    const rows = dates.map(d => ({ d, s: status(h, d), v: getVal(h, key(d)) }));
+    let head, chart;
+    if (h.type === 'num') {
       const vals = rows.filter(r => !['off', 'pre', 'future'].includes(r.s) && r.v != null).map(r => r.v);
-      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-      const p = avg == null ? null : avg / h.target;
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null, p = avg == null ? null : avg / h.target;
       const scale = Math.max(h.target, ...vals, 0.0001) * 1.15;
       const bars = rows.map(r => {
         if (['off', 'pre'].includes(r.s)) return '<div class="sb none"><i></i></div>';
         if (r.s === 'future' || r.v == null) return `<div class="sb empty"><span>${r.s === 'future' ? '' : '–'}</span><i></i></div>`;
         return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%"></i></div>`;
       }).join('');
-      return `<article class="scard" style="--i:${i}"><header><div><h3>${esc(h.name)}</h3><small>${avg == null ? 'brak wpisów' : `średnia <b>${nf(+avg.toFixed(2))} ${esc(h.unit)}</b> z ${vals.length} ${vals.length === 1 ? 'dnia' : 'dni'} · cel ${nf(h.target)} ${esc(h.unit)}`}</small></div><strong class="${cls(p)}">${p == null ? '—' : pct(p) + '%'}</strong></header>
-        <div class="sbars">${bars}<em class="starget" style="bottom:${h.target / scale * 100}%"><span>cel ${nf(h.target)}</span></em></div>
-        <div class="sdays">${dates.map(dayLbl).join('')}</div></article>`;
-    };
-    const boolCard = (h, i) => {
-      const rows = dates.map(d => ({ d, s: status(h, d) }));
+      head = [avg == null ? 'brak wpisów' : `średnia <b>${nf(+avg.toFixed(2))} ${esc(h.unit)}</b> z ${vals.length} ${vals.length === 1 ? 'dnia' : 'dni'} · cel ${nf(h.target)} ${esc(h.unit)}`, p];
+      chart = `<div class="sbars${month ? ' m' : ''}" style="--n:${dates.length}">${bars}<em class="starget" style="bottom:${h.target / scale * 100}%"><span>cel ${nf(h.target)}</span></em></div><div class="sdays${month ? ' m' : ''}" style="--n:${dates.length}">${dates.map(lbl).join('')}</div>`;
+    } else {
       const counted = rows.filter(r => ['done', 'miss', 'pending'].includes(r.s)), done = counted.filter(r => r.s === 'done').length;
-      const p = counted.length ? done / counted.length : null;
-      const cells = rows.map(r => `<div class="sc ${r.s}">${r.s === 'done' ? CHECK : r.s === 'miss' ? XMARK : ''}</div>`).join('');
-      return `<article class="scard" style="--i:${i}"><header><div><h3>${esc(h.name)}</h3><small>${counted.length ? `<b>${done} z ${counted.length}</b> ${counted.length === 1 ? 'dnia' : 'dni'}` : 'jeszcze nie zaczęte'}</small></div><strong class="${cls(p)}">${p == null ? '—' : pct(p) + '%'}</strong></header>
-        <div class="scells">${cells}</div>
-        <div class="sdays">${dates.map(dayLbl).join('')}</div></article>`;
-    };
-    $('view-summary').innerHTML = `<div class="snav">${navBtn(-1)}<b>${rng}</b>${navBtn(1)}</div>
-      <div class="scards${animList ? ' enter' : ''}">${hs.map((h, i) => h.type === 'num' ? numCard(h, i) : boolCard(h, i)).join('') || '<p class="empty">W tym tygodniu nie było jeszcze żadnych nawyków.</p>'}</div>`;
+      head = [counted.length ? `<b>${done} z ${counted.length}</b> ${counted.length === 1 ? 'dnia' : 'dni'}` : 'jeszcze nie zaczęte', counted.length ? done / counted.length : null];
+      const cell = r => `<div class="sc ${r.s}${key(r.d) === t ? ' today' : ''}">${month ? `<b>${r.d.getDate()}</b>` : r.s === 'done' ? CHECK : r.s === 'miss' ? XMARK : ''}</div>`;
+      chart = month
+        ? `<div class="sdays">${DAYS.map(d => `<span>${d}</span>`).join('')}</div><div class="scells m">${'<div class="sc blank"></div>'.repeat(dow(first))}${rows.map(cell).join('')}</div>`
+        : `<div class="scells">${rows.map(cell).join('')}</div><div class="sdays">${dates.map(lbl).join('')}</div>`;
+    }
+    box.innerHTML = `<div class="sbar"><button class="spick" data-sum-pick aria-label="Zmień nawyk"><b>${esc(h.name)}</b><span aria-hidden="true">▾</span></button>
+        <div class="seg smode" role="group" aria-label="Okres"><button data-sum-mode="week" class="${month ? '' : 'on'}">Tydzień</button><button data-sum-mode="month" class="${month ? 'on' : ''}">Miesiąc</button></div></div>
+      <div class="snav">${navBtn(-1)}<b>${rng}</b>${navBtn(1)}</div>
+      <article class="scard${animList ? ' enter' : ''}"><header><div><h3>${esc(h.name)}</h3><small>${head[0]}</small></div><strong class="${cls(head[1])}">${head[1] == null ? '—' : pct(head[1]) + '%'}</strong></header>${chart}</article>`;
   }
 
   /* ---------- render ---------- */
@@ -232,7 +238,7 @@
     // „Dziś” tylko wtedy, gdy oglądasz coś innego niż teraz: inny tydzień (komputer), inny dzień (telefon), inny miesiąc (kalendarz).
     const now = new Date();
     const atNow = view === 'calendar' ? key(monthStart) === key(monthOf(now))
-      : view === 'summary' ? key(weekStart) === key(startOfWeek(now))
+      : view === 'summary' ? (sumMode === 'month' ? key(monthStart) === key(monthOf(now)) : key(weekStart) === key(startOfWeek(now)))
       : mobile ? key(selDay) === key(now) : key(weekStart) === key(startOfWeek(now));
     $('this-week').closest('.weeknav').hidden = atNow;
     document.querySelectorAll('.vtab[data-view]').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
@@ -247,11 +253,11 @@
       showPct(m == null ? null : pct(m));
       $('today-label').textContent = '';
     } else if (view === 'summary') {
-      const w = periodPct(dates.filter(d => key(d) <= t));
-      $('week-label').textContent = range;
+      const w = periodPct(sumDates().filter(d => key(d) <= t));
+      $('week-label').textContent = sumMode === 'month' ? MONTHS_NOM[monthStart.getMonth()] + ' ' + monthStart.getFullYear() : range;
       $('week-label').hidden = false;
       showPct(w == null ? null : pct(w));
-      $('today-label').textContent = 'tydzień';
+      $('today-label').textContent = sumMode === 'month' ? 'miesiąc' : 'tydzień';
     } else {
       $('week-label').textContent = range;
       $('week-label').hidden = mobile; // na telefonie bez zakresu tygodnia u góry
@@ -614,6 +620,10 @@
       else openEditor(h.id, c.dataset.k);
       return;
     }
+    const sh = e.target.closest('[data-sum-habit]'); if (sh) { sumHabit = sh.dataset.sumHabit; animList = true; render(); window.scrollTo({ top: 0 }); return; }
+    if (e.target.closest('[data-sum-pick]')) { sumHabit = null; animList = true; render(); return; }
+    const sm = e.target.closest('[data-sum-mode]');
+    if (sm) { sumMode = sm.dataset.sumMode; if (sumMode === 'month') monthStart = monthOf(isMobile() ? selDay : addDays(weekStart, 3)); animList = true; render(); return; }
     const nt = e.target.closest('[data-note]'); if (nt) { openNote(nt.dataset.note); return; }
     const sk = e.target.closest('[data-skip]'); if (sk) { state.skips[sk.dataset.skip] = 1; save(); render(); return; }
     const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
@@ -643,18 +653,19 @@
   function canPrev() {
     const start = fromKey(state.start);
     if (view === 'calendar') return monthStart > monthOf(start);
-    if (view === 'summary') return weekStart > start;
+    if (view === 'summary') return sumMode === 'month' ? monthStart > monthOf(start) : weekStart > start;
     return isMobile() ? selDay > start : weekStart > start;
   }
   function step(dir) {
     if (dir < 0 && !canPrev()) return;
     if (view === 'calendar') { monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1); animList = true; }
+    else if (view === 'summary' && sumMode === 'month') { monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1); animList = true; }
     else if (view === 'summary') { weekStart = addDays(weekStart, 7 * dir); selDay = addDays(selDay, 7 * dir); if (selDay < fromKey(state.start)) selDay = fromKey(state.start); animList = true; }
     else if (isMobile()) { selDay = addDays(selDay, dir); weekStart = startOfWeek(selDay); slideDir = dir; }
     else { weekStart = addDays(weekStart, 7 * dir); slideDir = dir; }
     render();
   }
-  function setView(v) { view = v; rowMenu = null; animList = true; try { localStorage.setItem('hbtrack.view', view); } catch (_) { } render(); }
+  function setView(v) { if (v === 'summary' && view !== 'summary') sumHabit = null; view = v; rowMenu = null; animList = true; try { localStorage.setItem('hbtrack.view', view); } catch (_) { } render(); }
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && overlay.innerHTML) close();
     else if (e.key === 'Escape' && rowMenu) { const id = rowMenu; rowMenu = null; render(); document.querySelector(`[data-more="${id}"]`)?.focus(); return; }
