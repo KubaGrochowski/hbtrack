@@ -50,7 +50,7 @@
   let rowMenu = null;
   let view = 'week';
   let monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  try { const v = localStorage.getItem('hbtrack.view'); if (v === 'calendar') view = v; } catch (_) { }
+  try { const v = localStorage.getItem('hbtrack.view'); if (v === 'calendar' || v === 'summary') view = v; } catch (_) { }
 
   function load() {
     try {
@@ -162,6 +162,44 @@
     $('view-calendar').innerHTML = `<section class="panel">${cal}</div></section>`;
   }
 
+  /* ---------- podsumowanie tygodnia ---------- */
+  function renderSummary() {
+    const dates = weekDates(), t = todayKey();
+    const hs = habitsActive().filter(h => dates.some(d => !['off', 'pre'].includes(status(h, d))));
+    const last = dates[6], rng = dates[0].getMonth() === last.getMonth()
+      ? `${dates[0].getDate()}–${last.getDate()} ${MONTHS_GEN[last.getMonth()]}`
+      : `${dates[0].getDate()} ${MONTHS_GEN[dates[0].getMonth()].slice(0, 3)} – ${last.getDate()} ${MONTHS_GEN[last.getMonth()].slice(0, 3)}`;
+    const cls = p => p == null ? '' : p >= 0.8 ? 'good' : p >= 0.5 ? 'mid' : 'bad';
+    const dayLbl = d => `<span class="${key(d) === t ? 't' : ''}">${DAYS[dow(d)]}</span>`;
+
+    const numCard = (h, i) => {
+      const rows = dates.map(d => ({ d, s: status(h, d), v: getVal(h, key(d)) }));
+      const vals = rows.filter(r => !['off', 'pre', 'future'].includes(r.s) && r.v != null).map(r => r.v);
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      const p = avg == null ? null : avg / h.target;
+      const scale = Math.max(h.target, ...vals, 0.0001) * 1.15;
+      const bars = rows.map(r => {
+        if (['off', 'pre'].includes(r.s)) return '<div class="sb none"><i></i></div>';
+        if (r.s === 'future' || r.v == null) return `<div class="sb empty"><span>${r.s === 'future' ? '' : '–'}</span><i></i></div>`;
+        return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%"></i></div>`;
+      }).join('');
+      return `<article class="scard" style="--i:${i}"><header><div><h3>${esc(h.name)}</h3><small>${avg == null ? 'brak wpisów' : `średnia <b>${nf(+avg.toFixed(2))} ${esc(h.unit)}</b> z ${vals.length} ${vals.length === 1 ? 'dnia' : 'dni'} · cel ${nf(h.target)} ${esc(h.unit)}`}</small></div><strong class="${cls(p)}">${p == null ? '—' : pct(p) + '%'}</strong></header>
+        <div class="sbars">${bars}<em class="starget" style="bottom:${h.target / scale * 100}%"><span>cel ${nf(h.target)}</span></em></div>
+        <div class="sdays">${dates.map(dayLbl).join('')}</div></article>`;
+    };
+    const boolCard = (h, i) => {
+      const rows = dates.map(d => ({ d, s: status(h, d) }));
+      const counted = rows.filter(r => ['done', 'miss', 'pending'].includes(r.s)), done = counted.filter(r => r.s === 'done').length;
+      const p = counted.length ? done / counted.length : null;
+      const cells = rows.map(r => `<div class="sc ${r.s}">${r.s === 'done' ? CHECK : r.s === 'miss' ? XMARK : ''}</div>`).join('');
+      return `<article class="scard" style="--i:${i}"><header><div><h3>${esc(h.name)}</h3><small>${counted.length ? `<b>${done} z ${counted.length}</b> ${counted.length === 1 ? 'dnia' : 'dni'}` : 'jeszcze nie zaczęte'}</small></div><strong class="${cls(p)}">${p == null ? '—' : pct(p) + '%'}</strong></header>
+        <div class="scells">${cells}</div>
+        <div class="sdays">${dates.map(dayLbl).join('')}</div></article>`;
+    };
+    $('view-summary').innerHTML = `<div class="snav">${navBtn(-1)}<b>${rng}</b>${navBtn(1)}</div>
+      <div class="scards${animList ? ' enter' : ''}">${hs.map((h, i) => h.type === 'num' ? numCard(h, i) : boolCard(h, i)).join('') || '<p class="empty">W tym tygodniu nie było jeszcze żadnych nawyków.</p>'}</div>`;
+  }
+
   /* ---------- render ---------- */
   const $ = id => document.getElementById(id);
   // Płynne przeliczanie dużego procentu (zamiast skoku liczby).
@@ -192,18 +230,26 @@
     // „Dziś” tylko wtedy, gdy oglądasz coś innego niż teraz: inny tydzień (komputer), inny dzień (telefon), inny miesiąc (kalendarz).
     const now = new Date();
     const atNow = view === 'calendar' ? key(monthStart) === key(monthOf(now))
+      : view === 'summary' ? key(weekStart) === key(startOfWeek(now))
       : mobile ? key(selDay) === key(now) : key(weekStart) === key(startOfWeek(now));
     $('this-week').closest('.weeknav').hidden = atNow;
     document.querySelectorAll('.vtab[data-view]').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view));
     $('view-week').hidden = view !== 'week';
     $('view-calendar').hidden = view !== 'calendar';
-    $('add-habit').hidden = view === 'calendar'; // w kalendarzu nawyków się nie dodaje
+    $('view-summary').hidden = view !== 'summary';
+    $('add-habit').hidden = view !== 'week'; // nawyki dodaje się tylko w widoku tygodnia
     if (view === 'calendar') {
       const m = monthPct(monthStart);
       $('week-label').textContent = `${MONTHS_NOM[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
       $('week-label').hidden = false;
       showPct(m == null ? null : pct(m));
       $('today-label').textContent = '';
+    } else if (view === 'summary') {
+      const w = periodPct(dates.filter(d => key(d) <= t));
+      $('week-label').textContent = range;
+      $('week-label').hidden = false;
+      showPct(w == null ? null : pct(w));
+      $('today-label').textContent = 'tydzień';
     } else {
       $('week-label').textContent = range;
       $('week-label').hidden = mobile; // na telefonie bez zakresu tygodnia u góry
@@ -231,10 +277,13 @@
       $('empty').innerHTML = `Nie masz jeszcze nawyków. Kliknij „+ Dodaj”, żeby dodać pierwszy.`;
       $('list').innerHTML = '';
       $('view-calendar').innerHTML = '';
+      $('view-summary').innerHTML = '';
+      $('view-summary').hidden = true;
       $('view-week').hidden = false;
       return;
     }
     if (view === 'calendar') renderCalendar();
+    if (view === 'summary') renderSummary();
     // Najpierw nawyki zaplanowane na dzień odniesienia, potem pozostałe (kolejność w grupach bez zmian).
     // Telefon: wybrany dzień. Komputer: dziś, jeśli oglądany tydzień go zawiera; w innych tygodniach bez sortowania.
     // Nawyki „nie dziś” zawsze na końcu, za linią. Pora dnia to tylko etykieta na kafelku.
@@ -479,7 +528,7 @@
   $('menu-btn').addEventListener('click', () => {
     if (isMobile()) {
       const item = (v, label) => `<button class="nav-item${view === v ? ' on' : ''}" data-go-view="${v}">${label}</button>`;
-      overlay.innerHTML = sheet('Menu', '', `<nav class="navmenu">${item('week', 'Tydzień')}${item('calendar', 'Kalendarz')}<button class="nav-item out" id="logout">Wyloguj się</button></nav>`, 'Menu');
+      overlay.innerHTML = sheet('Menu', '', `<nav class="navmenu">${item('week', 'Tydzień')}${item('calendar', 'Kalendarz')}${item('summary', 'Podsumowanie')}<button class="nav-item out" id="logout">Wyloguj się</button></nav>`, 'Menu');
       overlay.querySelectorAll('[data-go-view]').forEach(b => b.addEventListener('click', () => {
         const v = b.dataset.goView;
         if (v === 'calendar' && view !== 'calendar') monthStart = monthOf(selDay);
@@ -592,11 +641,13 @@
   function canPrev() {
     const start = fromKey(state.start);
     if (view === 'calendar') return monthStart > monthOf(start);
+    if (view === 'summary') return weekStart > start;
     return isMobile() ? selDay > start : weekStart > start;
   }
   function step(dir) {
     if (dir < 0 && !canPrev()) return;
     if (view === 'calendar') { monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1); animList = true; }
+    else if (view === 'summary') { weekStart = addDays(weekStart, 7 * dir); selDay = addDays(selDay, 7 * dir); if (selDay < fromKey(state.start)) selDay = fromKey(state.start); animList = true; }
     else if (isMobile()) { selDay = addDays(selDay, dir); weekStart = startOfWeek(selDay); slideDir = dir; }
     else { weekStart = addDays(weekStart, 7 * dir); slideDir = dir; }
     render();
