@@ -28,6 +28,10 @@
       s.start = key(startOfWeek(c ? fromKey(c) : new Date()));
     }
     if (!s.notes || typeof s.notes !== 'object') s.notes = {};
+    if (!s.skips || typeof s.skips !== 'object') s.skips = {};
+    // odpuszczone zaległości starsze niż tydzień nie są już potrzebne
+    const old = key(addDays(new Date(), -7));
+    Object.keys(s.skips).forEach(k => { if ((k.split('|')[1] || '') < old) delete s.skips[k]; });
     return s;
   }
 
@@ -67,7 +71,7 @@
   }
   // Stan z chmury (po synchronizacji): zapis lokalny bez oznaczania go jako zmiany z tego urządzenia.
   function applyState(s) {
-    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, start: s.start });
+    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, skips: s.skips || {}, start: s.start });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
     render();
   }
@@ -240,8 +244,14 @@
     const isOff = h => ref && status(h, ref) === 'off';
     const cur = hs.filter(h => !isLater(h)), later = hs.filter(isLater);
     const onList = cur.filter(h => !isOff(h)), offList = cur.filter(isOff);
+    // Zaległe z wczoraj: pominięte lub częściowe, nieodpuszczone. Telefon: osobna sekcja na górze dzisiejszego dnia; komputer: plakietka przy nazwie.
+    const yDay = addDays(dayOnly(new Date()), -1), yKey = key(yDay);
+    const isOverdue = h => ['miss', 'part'].includes(status(h, yDay)) && !state.skips[h.id + '|' + yKey];
+    const showOverdue = mobile ? key(selDay) === t : key(dates[0]) <= t && t <= key(end);
+    const overdue = showOverdue ? hs.filter(isOverdue) : [];
     let rowIdx = 0;
-    let html = onList.map(rowHtml).join('');
+    let html = mobile && overdue.length ? `<div class="grp later od-h">Zaległe z wczoraj</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep"></div>` : '';
+    html += onList.map(rowHtml).join('');
     if (offList.length) html += (onList.length ? `<div class="grp sep"></div>` : '') + offList.map(rowHtml).join('');
     if (later.length) html += `<div class="grp later">Dodane później</div>` + later.map(rowHtml).join('');
     const vw = $('view-week'), listEl = $('list');
@@ -252,6 +262,11 @@
     animList = false; slideDir = 0; justCell = null;
     renderTimerCard();
 
+    function odRowHtml(h) {
+      const idx = rowIdx++, s = status(h, yDay), v = getVal(h, yKey);
+      const sub = h.type === 'num' ? `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}` : 'nie zrobione';
+      return `<div class="o-row od" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z wczoraj</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, wczoraj"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
+    }
     function rowHtml(h) {
       const idx = rowIdx++;
       const cells = shown.map(d => {
@@ -275,6 +290,7 @@
       // licznik czasu: dla nawyków w minutach/godzinach, na dziś, dopóki cel nie jest zrobiony
       const tk = todayKey(), canTime = timeUnit(h) && (mobile ? key(selDay) === tk : true) && status(h, fromKey(tk)) !== 'done' && status(h, fromKey(tk)) !== 'off';
       const running = timer && timer.hid === h.id;
+      const odTag = !mobile && overdue.includes(h) ? '<span class="odtag">wczoraj</span>' : '';
       const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
         : canTime ? `<button class="tbtn" data-timer="${h.id}" aria-label="Uruchom licznik: ${esc(h.name)}">${CLOCK}</button>` : '';
       if (running) sub = `<span data-timer-left>${fmtLeft(timerLeft())}</span> pozostało`;
@@ -282,7 +298,7 @@
       const tl = TIMES.find(([v]) => v === h.time)?.[1];
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
       const fire = sk >= 2 ? `<span class="streak" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
-      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
+      return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${odTag}${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
     }
   }
 
@@ -397,7 +413,7 @@
   function confirmDelete(hid) {
     const h = state.habits.find(x => x.id === hid); if (!h) return;
     overlay.innerHTML = sheet('Usunąć nawyk?', esc(h.name), `<div class="confirm"><button data-close>Anuluj</button><button class="yes" id="confirm-del">Usuń</button></div>`);
-    $('confirm-del').addEventListener('click', () => { state.habits = state.habits.filter(x => x.id !== h.id); delete state.entries[h.id]; save(); close(); render(); });
+    $('confirm-del').addEventListener('click', () => { state.habits = state.habits.filter(x => x.id !== h.id); delete state.entries[h.id]; Object.keys(state.skips).forEach(k => { if (k.startsWith(h.id + '|')) delete state.skips[k]; }); save(); close(); render(); });
   }
 
   /* ---------- ekran logowania: bez konta nie ma panelu ---------- */
@@ -532,11 +548,12 @@
       const h = state.habits.find(x => x.id === c.dataset.h);
       if (timer && timer.hid === h.id) stopTimer(false);
       // tak/nie: klik przełącza tylko zrobione ↔ puste
-      if (h.type === 'bool') { setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; render(); }
+      if (h.type === 'bool') { const od = c.hasAttribute('data-od'); setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; render(); if (od) toast(`Nadrobione: ${h.name}`); }
       else openEditor(h.id, c.dataset.k);
       return;
     }
     const nt = e.target.closest('[data-note]'); if (nt) { openNote(nt.dataset.note); return; }
+    const sk = e.target.closest('[data-skip]'); if (sk) { state.skips[sk.dataset.skip] = 1; save(); render(); return; }
     const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
     if (e.target.closest('[data-timer-stop]')) { stopTimer(false); return; }
     const more = e.target.closest('[data-more]');
@@ -669,7 +686,7 @@
 
   /* ---------- telefon: przesuń wiersz w prawo = zrobione, w lewo = wyczyść ---------- */
   let swipe = null, suppressClick = false;
-  const canSwipe = id => { const h = state.habits.find(x => x.id === id); const s = h && status(h, selDay); return isMobile() && view === 'week' && !['off', 'pre', 'future'].includes(s); };
+  const canSwipe = id => { const h = state.habits.find(x => x.id === id); const s = h && status(h, selDay); return !!h && isMobile() && view === 'week' && !['off', 'pre', 'future'].includes(s); };
   list.addEventListener('pointerdown', e => {
     const row = e.target.closest('.o-row');
     if (!row || drag || e.target.closest('.grip, .rmenu') || !canSwipe(row.dataset.id)) return;
