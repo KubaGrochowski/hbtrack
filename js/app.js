@@ -103,7 +103,6 @@
     dates.forEach(d => habitsActive().forEach(h => { const st = status(h, d); if (!(st in SCORE) && st !== 'pending') return; n++; s += SCORE[st] || 0; }));
     return n ? s / n : null;
   }
-  const overall = (ws = weekStart) => periodPct(weekDates(ws));
   const dayPct = d => periodPct([d]);
   // Seria: zrobione zaplanowane dni pod rząd, licząc wstecz od dziś (dziś bez wpisu i dni wolne nie przerywają).
   function streak(h) {
@@ -122,7 +121,8 @@
     if (t) state.notes[k] = t; else delete state.notes[k];
     save();
   }
-  function todayDone() { const t = new Date(); const hs = habitsActive().filter(h => !['off', 'pre'].includes(status(h, t))); return [hs.filter(h => status(h, t) === 'done').length, hs.length]; }
+  // [zrobione, zaplanowane] dla danego dnia
+  function dayDone(d) { const hs = habitsActive().filter(h => !['off', 'pre'].includes(status(h, d))); return [hs.filter(h => status(h, d) === 'done').length, hs.length]; }
   const pct = p => Math.round(p * 100);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const CHECK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -203,10 +203,11 @@
     } else {
       $('week-label').textContent = range;
       $('week-label').hidden = mobile; // na telefonie bez zakresu tygodnia u góry
-      showPct(pct(overall() ?? 0));
-      const cur = key(dates[0]) <= t && t <= key(end);
-      if (cur) { const [a, b] = todayDone(); $('today-label').innerHTML = `<em>${a}/${b}</em>`; }
-      else $('today-label').textContent = key(end) < t ? 'miniony tydzień' : 'nadchodzący tydzień';
+      // Duży procent liczy jeden dzień: na telefonie oglądany, na komputerze dzisiejszy.
+      const day = mobile ? selDay : dayOnly(new Date());
+      const dp = dayPct(day), [a, b] = dayDone(day);
+      showPct(dp == null ? (key(day) > t ? null : 0) : pct(dp));
+      $('today-label').innerHTML = `<em>${a}/${b}</em>`;
     }
 
     $('day-head').classList.toggle('single', mobile);
