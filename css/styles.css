@@ -320,3 +320,7 @@ button:not(:disabled):active{transform:scale(.96)}
 .odx:hover{color:var(--miss)}
 .o-row.od.old{border-color:color-mix(in srgb,var(--miss) 45%,var(--line))}
 .o-row.od.old .odtag,.odtag.old{color:var(--miss);border-color:color-mix(in srgb,var(--miss) 50%,transparent)}
+/* edytor: liczba bez zaznaczenia i bez migania przy +/− */
+.ed-val button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.ed-val input{caret-color:var(--accent);-webkit-tap-highlight-color:transparent}
+.ed-val input::selection{background:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--ink)}

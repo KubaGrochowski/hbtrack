@@ -357,20 +357,26 @@
       inp.addEventListener('input', () => {
         inp.style.width = Math.max(1, inp.value.length) + 'ch';
         const n = parseFloat(inp.value.replace(',', '.'));
-        setVal(h, k, isNaN(n) ? null : Math.max(0, n)); justCell = { h: h.id, k }; render();
-        const p = prog(h, getVal(h, k)); const bar = overlay.querySelector('.prog i'); bar.style.width = p * 100 + '%'; bar.classList.toggle('full', p >= 1);
+        setVal(h, k, isNaN(n) ? null : Math.max(0, n)); render();
+        syncEditor(h, k, false);
       });
-      inp.focus(); inp.select();
     }
+  }
+  // Odświeża otwarty edytor w miejscu (liczba, szerokość pola, pasek), bez przebudowy okienka.
+  function syncEditor(h, k, setInput = true) {
+    const v = getVal(h, k), inp = $('ed-input'), bar = overlay.querySelector('.prog i');
+    if (inp && setInput) { inp.value = v ?? ''; inp.style.width = Math.max(1, String(v ?? '').length) + 'ch'; }
+    if (bar) { const p = prog(h, v); bar.style.width = p * 100 + '%'; bar.classList.toggle('full', p >= 1); }
   }
   overlay.addEventListener('click', e => {
     if (e.target.hasAttribute('data-close')) { close(); return; }
     const b = e.target.closest('[data-ed]'); if (!b || !edit) return;
     const h = state.habits.find(x => x.id === edit.hid), k = edit.k, a = b.dataset.ed, v = getVal(h, k) || 0;
     const map = { '+': +(v + h.step).toFixed(2), '-': Math.max(0, +(v - h.step).toFixed(2)), clear: null, target: h.target, yes: 1, no: 0 };
-    setVal(h, k, map[a]); justCell = { h: h.id, k }; render();
-    if (h.type === 'bool' && a !== 'clear') { close(); return; }
-    drawEditor();
+    setVal(h, k, map[a]);
+    if (h.type === 'bool') { justCell = { h: h.id, k }; render(); if (a !== 'clear') close(); else drawEditor(); return; }
+    render();
+    syncEditor(h, k);
   });
 
   function openHabitForm(hid) {
