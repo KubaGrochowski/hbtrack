@@ -38,7 +38,7 @@ W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (k
 - **⋯ przy nawyku** pokazuje ołówek (edycja) i × (usunięcie).
 - Klik w **kółko** dnia: nawyk liczbowy otwiera edytor wartości, nawyk tak/nie przełącza zrobione ↔ puste.
 - Zakładki **Tydzień / Kalendarz**. Kalendarz pokazuje % zrobionych nawyków w każdym dniu; klik w dzień otwiera jego tydzień.
-- Zaległe z wczoraj: na telefonie sekcja na górze dzisiejszego dnia (kółko nadrabia wczorajszy wpis, × odpuszcza), na komputerze plakietka „wczoraj” przy nazwie.
+- Zaległe: na telefonie sekcja na górze dzisiejszego dnia (kółko nadrabia wpis z tamtego dnia, × odpuszcza), na komputerze plakietka przy nazwie. Wczorajsze są pomarańczowe („z wczoraj”), nienadrobione po kolejnym dniu czerwone („z przedwczoraj”); starsze znikają.
 - Płomyk z liczbą przy nazwie = seria zrobionych dni pod rząd.
 - Licznik czasu (ikona zegara) dla nawyków w minutach/godzinach: odlicza to, ile brakuje do dzisiejszego celu; liczy od zapisanej godziny startu, więc działa po wyjściu z aplikacji. Koniec = odhaczenie (wibracja, powiadomienie za zgodą); Stop wcześniej dopisuje przeliczony czas.
 - Uchwyt ⋮⋮ przy nazwie: przeciągnij, żeby zmienić kolejność.

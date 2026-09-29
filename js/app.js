@@ -245,12 +245,15 @@
     const cur = hs.filter(h => !isLater(h)), later = hs.filter(isLater);
     const onList = cur.filter(h => !isOff(h)), offList = cur.filter(isOff);
     // Zaległe z wczoraj: pominięte lub częściowe, nieodpuszczone. Telefon: osobna sekcja na górze dzisiejszego dnia; komputer: plakietka przy nazwie.
-    const yDay = addDays(dayOnly(new Date()), -1), yKey = key(yDay);
-    const isOverdue = h => ['miss', 'part'].includes(status(h, yDay)) && !state.skips[h.id + '|' + yKey];
+    // Sięgają dwa dni wstecz: wczorajsze są pomarańczowe, przedwczorajsze (nienadrobione) czerwone.
     const showOverdue = mobile ? key(selDay) === t : key(dates[0]) <= t && t <= key(end);
-    const overdue = showOverdue ? hs.filter(isOverdue) : [];
+    const overdue = [];
+    if (showOverdue) for (const age of [2, 1]) {
+      const d = addDays(dayOnly(new Date()), -age), k = key(d);
+      hs.forEach(h => { if (['miss', 'part'].includes(status(h, d)) && !state.skips[h.id + '|' + k]) overdue.push({ h, d, k, age }); });
+    }
     let rowIdx = 0;
-    let html = mobile && overdue.length ? `<div class="grp later od-h">Zaległe z wczoraj</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep"></div>` : '';
+    let html = mobile && overdue.length ? `<div class="grp later od-h">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep"></div>` : '';
     html += onList.map(rowHtml).join('');
     if (offList.length) html += (onList.length ? `<div class="grp sep"></div>` : '') + offList.map(rowHtml).join('');
     if (later.length) html += `<div class="grp later">Dodane później</div>` + later.map(rowHtml).join('');
@@ -262,10 +265,10 @@
     animList = false; slideDir = 0; justCell = null;
     renderTimerCard();
 
-    function odRowHtml(h) {
-      const idx = rowIdx++, s = status(h, yDay), v = getVal(h, yKey);
+    function odRowHtml({ h, d, k, age }) {
+      const idx = rowIdx++, s = status(h, d), v = getVal(h, k), yKey = k, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
       const sub = h.type === 'num' ? `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}` : 'nie zrobione';
-      return `<div class="o-row od" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z wczoraj</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, wczoraj"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
+      return `<div class="o-row od${age === 2 ? ' old' : ''}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}" style="--p:${pct(prog(h, v))}"></span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
     }
     function rowHtml(h) {
       const idx = rowIdx++;
@@ -290,7 +293,7 @@
       // licznik czasu: dla nawyków w minutach/godzinach, na dziś, dopóki cel nie jest zrobiony
       const tk = todayKey(), canTime = timeUnit(h) && (mobile ? key(selDay) === tk : true) && status(h, fromKey(tk)) !== 'done' && status(h, fromKey(tk)) !== 'off';
       const running = timer && timer.hid === h.id;
-      const odTag = !mobile && overdue.includes(h) ? '<span class="odtag">wczoraj</span>' : '';
+      const odTag = mobile ? '' : overdue.filter(o => o.h === h).map(o => `<span class="odtag${o.age === 2 ? ' old' : ''}">${o.age === 2 ? 'przedwczoraj' : 'wczoraj'}</span>`).join('');
       const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
         : canTime ? `<button class="tbtn" data-timer="${h.id}" aria-label="Uruchom licznik: ${esc(h.name)}">${CLOCK}</button>` : '';
       if (running) sub = `<span data-timer-left>${fmtLeft(timerLeft())}</span> pozostało`;

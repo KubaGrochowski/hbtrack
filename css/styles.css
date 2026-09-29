@@ -318,3 +318,5 @@ button:not(:disabled):active{transform:scale(.96)}
 .odtag{flex:none;font:600 10.5px var(--f-mono);letter-spacing:.04em;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);border-radius:999px;padding:1px 7px}
 .odx{color:var(--ink-3)}
 .odx:hover{color:var(--miss)}
+.o-row.od.old{border-color:color-mix(in srgb,var(--miss) 45%,var(--line))}
+.o-row.od.old .odtag,.odtag.old{color:var(--miss);border-color:color-mix(in srgb,var(--miss) 50%,transparent)}
