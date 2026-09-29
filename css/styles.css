@@ -390,3 +390,5 @@ button:not(:disabled):active{transform:scale(.96)}
 .scells.m .sc.blank{background:transparent;box-shadow:none}
 .sc.today{outline:2px solid var(--ink);outline-offset:1px}
 @media (max-width:680px){.slist,.sbar,#view-summary > .scard{max-width:none}}
+.ed-val input::placeholder{color:var(--ink-3);opacity:1}
+.ed-val input.zero{color:var(--ink-3)}

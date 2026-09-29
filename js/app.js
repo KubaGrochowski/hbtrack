@@ -404,7 +404,7 @@
     if (h.type === 'num') {
       const p = prog(h, v);
       const w = v => Math.max(1, String(v ?? '').length); // szerokość pola = liczba znaków, żeby jednostka stała tuż za liczbą
-      body = `<div class="ed-val"><button data-ed="-" aria-label="Mniej">−</button><label class="ed-num" for="ed-input"><input id="ed-input" type="number" inputmode="decimal" step="${h.step}" min="0" value="${v ?? ''}" placeholder="0" aria-label="Wartość" style="width:${w(v)}ch">${h.unit ? `<span class="ed-u">${esc(h.unit)}</span>` : ''}</label><button data-ed="+" aria-label="Więcej">+</button></div><div class="prog"><i class="${p >= 1 ? 'full' : ''}" style="width:${p * 100}%"></i></div><div class="chips"><button data-ed="target">Cel: ${nf(h.target)}${h.unit ? ' ' + esc(h.unit) : ''}</button></div>`;
+      body = `<div class="ed-val"><button data-ed="-" aria-label="Mniej">−</button><label class="ed-num" for="ed-input"><input id="ed-input" type="number" inputmode="decimal" step="${h.step}" min="0" value="${v || ''}" placeholder="0" aria-label="Wartość" style="width:${w(v || '')}ch">${h.unit ? `<span class="ed-u">${esc(h.unit)}</span>` : ''}</label><button data-ed="+" aria-label="Więcej">+</button></div><div class="prog"><i class="${p >= 1 ? 'full' : ''}" style="width:${p * 100}%"></i></div><div class="chips"><button data-ed="target">Cel: ${nf(h.target)}${h.unit ? ' ' + esc(h.unit) : ''}</button></div>`;
     } else {
       body = `<div class="yn"><button data-ed="yes" class="${v === 1 ? 'sel-done' : ''}">Zrobione</button><button data-ed="no" class="${v === 0 ? 'sel-miss' : ''}">Nie zrobione</button></div><div class="chips"><button data-ed="clear">Wyczyść wpis</button></div>`;
     }
@@ -412,6 +412,10 @@
     const inp = $('ed-input');
     if (inp) {
       inp.addEventListener('input', () => {
+        // bez zer na początku: „07” → „7”; samo zero zostaje, ale na szaro
+        const clean = inp.value.replace(/^0+(?=\d)/, '');
+        if (clean !== inp.value) inp.value = clean;
+        inp.classList.toggle('zero', !(parseFloat(inp.value.replace(',', '.')) > 0));
         inp.style.width = Math.max(1, inp.value.length) + 'ch';
         const n = parseFloat(inp.value.replace(',', '.'));
         setVal(h, k, isNaN(n) ? null : Math.max(0, n)); render();
@@ -422,7 +426,7 @@
   // Odświeża otwarty edytor w miejscu (liczba, szerokość pola, pasek), bez przebudowy okienka.
   function syncEditor(h, k, setInput = true) {
     const v = getVal(h, k), inp = $('ed-input'), bar = overlay.querySelector('.prog i');
-    if (inp && setInput) { inp.value = v ?? ''; inp.style.width = Math.max(1, String(v ?? '').length) + 'ch'; }
+    if (inp && setInput) { inp.value = v || ''; inp.style.width = Math.max(1, String(v || '').length) + 'ch'; inp.classList.remove('zero'); }
     if (bar) { const p = prog(h, v); bar.style.width = p * 100 + '%'; bar.classList.toggle('full', p >= 1); }
   }
   overlay.addEventListener('click', e => {
