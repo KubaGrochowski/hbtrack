@@ -876,6 +876,16 @@
   function celebrate() {
     navigator.vibrate?.([15, 60, 25]);
     if (calm()) return;
+    // nagroda: zielona fala przez cały ekran i duże „100%” na środku
+    const fx = document.createElement('div');
+    fx.className = 'win'; fx.setAttribute('aria-hidden', 'true');
+    fx.innerHTML = '<i class="win-wave"></i><b class="win-txt">100%</b>';
+    document.body.appendChild(fx);
+    fx.animate({ backgroundColor: ['rgba(0,0,0,0)', 'rgba(0,0,0,.6)', 'rgba(0,0,0,.6)', 'rgba(0,0,0,0)'], offset: [0, .2, .75, 1] }, { duration: 1900 });
+    fx.querySelector('.win-wave').animate({ transform: ['translateY(100vh)', 'translateY(-100%)'] }, { duration: 1400, easing: 'cubic-bezier(.45,0,.55,1)' });
+    fx.querySelector('.win-txt').animate({ opacity: [0, 1, 1, 0], transform: ['scale(.5)', 'scale(1.08)', 'scale(1)', 'scale(1.2)'], offset: [0, .3, .75, 1] },
+      { duration: 1900, easing: 'ease-out' }).onfinish = () => fx.remove();
+    setTimeout(() => fx.remove(), 2600); // zapas, gdy karta w tle wstrzyma animacje
     $('week-pct').animate({ transform: ['scale(1)', 'scale(1.14)', 'scale(.98)', 'scale(1)'], color: ['#fff', '#4ADE80', '#4ADE80', '#fff'] }, { duration: 900, easing: 'ease-out' });
     const off = 'inset 0 0 0 1px rgba(74,222,128,0), 0 0 0 0 rgba(74,222,128,0)';
     [...list.querySelectorAll('.o-row[data-id]:not(.is-off)')].forEach((r, i) => r.animate(
