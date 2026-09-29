@@ -190,9 +190,9 @@
       const bars = rows.map(r => {
         if (['off', 'pre'].includes(r.s)) return '<div class="sb none"><i></i></div>';
         if (r.s === 'future' || r.v == null) return `<div class="sb empty"><span>${r.s === 'future' ? '' : '–'}</span><i></i></div>`;
-        return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%"></i></div>`;
+        return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%;background:${heat(Math.min(1, r.v / h.target))}"></i></div>`;
       }).join('');
-      head = [avg == null ? 'brak wpisów' : `średnia <b>${nf(+avg.toFixed(2))} ${esc(h.unit)}</b> z ${vals.length} ${vals.length === 1 ? 'dnia' : 'dni'} · cel ${nf(h.target)} ${esc(h.unit)}`, p];
+      head = [avg == null ? 'brak wpisów' : `średnia <b>${nf(+avg.toFixed(2))} ${esc(h.unit)}</b>`, p];
       chart = `<div class="sbars${month ? ' m' : ''}" style="--n:${dates.length}">${bars}<em class="starget" style="bottom:${h.target / scale * 100}%"><span>cel ${nf(h.target)}</span></em></div><div class="sdays${month ? ' m' : ''}" style="--n:${dates.length}">${dates.map(lbl).join('')}</div>`;
     } else {
       const counted = rows.filter(r => ['done', 'miss', 'pending'].includes(r.s)), done = counted.filter(r => r.s === 'done').length;
