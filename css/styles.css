@@ -408,3 +408,24 @@ button:not(:disabled):active{transform:scale(.96)}
   .cd b{font-size:15px}
   .cd small{font-size:10px}
 }
+
+/* zabawa: pękający kafelek */
+.o-row{position:relative}
+.cracks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:inherit;overflow:visible}
+.cracks path{fill:none;stroke:rgba(255,255,255,.62);stroke-width:1.4;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity .35s ease}
+.o-row[data-dmg] .k1,.o-row[data-dmg="2"] .k2,.o-row[data-dmg="3"] .k2,.o-row[data-dmg="4"] .k2,.o-row[data-dmg="5"] .k2,
+.o-row[data-dmg="3"] .k3,.o-row[data-dmg="4"] .k3,.o-row[data-dmg="5"] .k3,.o-row[data-dmg="4"] .k4,.o-row[data-dmg="5"] .k4{opacity:1}
+.o-row[data-dmg="3"]{filter:brightness(.95)}
+.o-row[data-dmg="4"]{filter:brightness(.88)}
+@keyframes tile-hit{0%{transform:translate(0,0) rotate(0)}25%{transform:translate(-3px,1px) rotate(-.5deg)}50%{transform:translate(3px,-1px) rotate(.5deg)}75%{transform:translate(-2px,0) rotate(-.25deg)}100%{transform:none}}
+@keyframes tile-heal{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+@keyframes tile-reborn{0%{opacity:0;transform:translateY(-14px) scale(.96)}60%{opacity:1;transform:translateY(2px) scale(1.01)}100%{opacity:1;transform:none}}
+#list .o-row.hit{animation:tile-hit .28s ease-out}
+#list .o-row.healed{animation:tile-heal .7s ease-out}
+#list .o-row.reborn{animation:tile-reborn .5s var(--ease)}
+#list .o-row.broken{visibility:hidden;animation:none}
+.shard{position:fixed;margin:0;z-index:45;pointer-events:none;display:grid;animation:none!important;transition:transform .9s cubic-bezier(.5,0,.9,.6),opacity .9s ease-in}
+.shard.l{transform-origin:30% 50%}
+.shard.r{transform-origin:70% 50%}
+.shard.l.fall{transform:translate(-46px,105vh) rotate(-28deg);opacity:.2}
+.shard.r.fall{transform:translate(52px,105vh) rotate(24deg);opacity:.2}
