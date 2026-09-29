@@ -197,10 +197,20 @@
     } else {
       const counted = rows.filter(r => ['done', 'miss', 'pending'].includes(r.s)), done = counted.filter(r => r.s === 'done').length;
       head = [counted.length ? `<b>${done} z ${counted.length}</b> ${counted.length === 1 ? 'dnia' : 'dni'}` : 'jeszcze nie zaczęte', counted.length ? done / counted.length : null];
-      const cell = r => `<div class="sc ${r.s}${key(r.d) === t ? ' today' : ''}">${month ? `<b>${r.d.getDate()}</b>` : r.s === 'done' ? CHECK : r.s === 'miss' ? XMARK : ''}</div>`;
-      chart = month
-        ? `<div class="sdays">${DAYS.map(d => `<span>${d}</span>`).join('')}</div><div class="scells m">${'<div class="sc blank"></div>'.repeat(dow(first))}${rows.map(cell).join('')}</div>`
-        : `<div class="scells">${rows.map(cell).join('')}</div><div class="sdays">${dates.map(lbl).join('')}</div>`;
+      // tylko dni, w które nawyk obowiązuje (np. Pn, Śr, Pt); bez wyróżniania dzisiejszego dnia
+      const cols = [...h.days].sort((x, y) => x - y), n = cols.length;
+      const cell = r => `<div class="sc ${r.s}">${month ? `<b>${r.d.getDate()}</b>` : r.s === 'done' ? CHECK : r.s === 'miss' ? XMARK : ''}</div>`;
+      const names = `<div class="sdays" style="--n:${n}">${cols.map(d => `<span>${DAYS[d]}</span>`).join('')}</div>`;
+      if (month) {
+        let cells = '';
+        for (let ws = startOfWeek(first); ws <= last; ws = addDays(ws, 7)) cols.forEach(d => {
+          const day = addDays(ws, d), r = day.getMonth() === first.getMonth() ? rows[day.getDate() - 1] : null;
+          cells += r ? cell(r) : '<div class="sc blank"></div>';
+        });
+        chart = `${names}<div class="scells m" style="--n:${n}">${cells}</div>`;
+      } else {
+        chart = `<div class="scells" style="--n:${n}">${rows.filter(r => cols.includes(dow(r.d))).map(cell).join('')}</div>${names}`;
+      }
     }
     box.innerHTML = `<div class="sbar"><button class="spick" data-sum-pick aria-label="Zmień nawyk"><b>${esc(h.name)}</b><span aria-hidden="true">▾</span></button>
         <div class="seg smode" role="group" aria-label="Okres"><button data-sum-mode="week" class="${month ? '' : 'on'}">Tydzień</button><button data-sum-mode="month" class="${month ? 'on' : ''}">Miesiąc</button></div></div>

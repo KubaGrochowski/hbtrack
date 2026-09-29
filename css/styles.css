@@ -349,7 +349,7 @@ button:not(:disabled):active{transform:scale(.96)}
 .sb.empty span{color:var(--ink-3)}
 .starget{position:absolute;left:0;right:0;height:0;border-top:1.5px dashed color-mix(in srgb,var(--ink) 45%,transparent);pointer-events:none}
 .starget span{position:absolute;right:0;top:-16px;font:500 10.5px var(--f-mono);color:var(--ink-2);background:var(--surface);padding:0 4px;font-style:normal}
-.scells{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.scells{display:grid;grid-template-columns:repeat(var(--n,7),minmax(0,56px));gap:8px}
 .sc{aspect-ratio:1;max-height:44px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);color:var(--ink-3)}
 .sc.done{background:var(--accent);color:#04180C}
 .sc.miss{background:color-mix(in srgb,var(--miss) 16%,transparent);color:var(--miss);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--miss) 55%,transparent)}
@@ -388,7 +388,23 @@ button:not(:disabled):active{transform:scale(.96)}
 .scells.m .sc{max-height:none;border-radius:8px;font:600 12px var(--f-mono)}
 .scells.m .sc b{font-weight:600}
 .scells.m .sc.blank{background:transparent;box-shadow:none}
-.sc.today{outline:2px solid var(--ink);outline-offset:1px}
 @media (max-width:680px){.slist,.sbar,#view-summary > .scard{max-width:none}}
 .ed-val input::placeholder{color:var(--ink-3);opacity:1}
 .ed-val input.zero{color:var(--ink-3)}
+/* podsumowanie tak/nie: tylko dni nawyku, kolumny tej samej szerokości co pola */
+.scard .scells + .sdays,.scard .sdays:has(+ .scells){grid-template-columns:repeat(var(--n,7),minmax(0,56px))}
+.sc{max-height:none}
+
+/* telefon: kalendarz na całą szerokość ekranu, strzałki nad siatką */
+@media (max-width:680px){
+  #view-calendar .panel{max-width:none;padding:12px 10px;gap:8px}
+  .cal-nav{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+  .cal-nav .navarr{width:36px;height:36px;font-size:20px}
+  .cal-nav .cal-h{order:3;flex:1 0 100%;min-width:0}
+  .cal{margin-inline:0}
+  .cal-h,.cal{gap:5px}
+  .cal-h span{font-size:11.5px}
+  .cd{min-width:0;border-radius:10px}
+  .cd b{font-size:15px}
+  .cd small{font-size:10px}
+}
