@@ -284,7 +284,7 @@ button:not(:disabled):active{transform:scale(.96)}
 #view-week.slide-r #list,#view-week.slide-r #day-head{animation:slide-r .26s var(--ease) backwards}
 
 /* kalendarz */
-.cal.enter .cd{animation:fade-in .25s both;animation-delay:calc(var(--i,0)*6ms)}
+.cal.enter .cd{animation:cal-light .45s var(--ease) both;animation-delay:calc(var(--i,0)*18ms)}
 .cd{transition:transform .15s,filter .15s}
 .cd:not(.blank):not(:disabled):hover{transform:scale(1.06)}
 
@@ -437,3 +437,32 @@ button:not(:disabled):active{transform:scale(.96)}
 @keyframes flicker{0%,100%{transform:scale(1.55) rotate(-3deg)}50%{transform:scale(1.64) rotate(3deg)}}
 .streak.flare svg{animation:flare .9s var(--ease)}
 @keyframes flare{0%{transform:scale(1)}35%{transform:scale(2.3);filter:drop-shadow(0 0 12px #FB923C) brightness(1.5)}}
+
+/* kalendarz zapala się falą od pierwszego dnia */
+@keyframes cal-light{0%{opacity:0;transform:scale(.7)}60%{opacity:1;transform:scale(1.06);filter:brightness(1.35)}100%{opacity:1;transform:none;filter:none}}
+
+/* łańcuch zrobionych dni (komputer) */
+.ob{position:relative}
+.ob .c{z-index:1}
+.ob.ln::after{content:"";position:absolute;left:50%;top:50%;width:calc(100% + 3px);height:2px;margin-top:-1px;background:color-mix(in srgb,var(--accent) 60%,transparent);border-radius:2px;pointer-events:none}
+.ob.ln-l::after{transform-origin:left;animation:link .35s .1s var(--ease) both}
+.ob.ln-r::after{transform-origin:right;animation:link .35s .1s var(--ease) both}
+@keyframes link{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* podsumowanie: słupki wyrastają od zera, linia celu dorysowuje się od lewej */
+.scard.enter .sb i{transform-origin:bottom;animation:grow .6s var(--ease) both;animation-delay:calc(120ms + var(--j,0)*45ms)}
+.scard.enter .sb span{animation:fade-in .3s both;animation-delay:calc(420ms + var(--j,0)*45ms)}
+.scard.enter .starget{animation:draw-x .7s .3s var(--ease) both}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes draw-x{from{clip-path:inset(-20px 100% -4px 0)}to{clip-path:inset(-20px 0 -4px 0)}}
+
+/* dzień dobry: pierwsze otwarcie dnia */
+.o-list.hello .o-row{animation:hello .55s cubic-bezier(.3,1.4,.5,1) backwards;animation-delay:calc(var(--i,0)*70ms)}
+.o-list.hello .o-row.od{--fl:var(--warn);animation:hello .55s cubic-bezier(.3,1.4,.5,1) backwards,od-flash .9s ease-out;animation-delay:calc(var(--i,0)*70ms),calc(var(--i,0)*70ms + 450ms)}
+.o-list.hello .o-row.od.old{--fl:var(--miss)}
+@keyframes hello{from{opacity:0;transform:translateX(44px)}to{opacity:1;transform:none}}
+@keyframes od-flash{0%,100%{box-shadow:0 0 0 0 transparent}35%{box-shadow:0 0 0 1px var(--fl),0 0 22px color-mix(in srgb,var(--fl) 40%,transparent)}}
+
+/* kółko liczbowe osiąga cel: dolewanie do pełna */
+.c.done.filling{background:var(--surface-2);overflow:hidden;isolation:isolate;animation:none}
+.c.done.filling svg{visibility:hidden}

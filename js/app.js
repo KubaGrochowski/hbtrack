@@ -47,7 +47,7 @@
   let animList = true, slideDir = 0, justCell = null;
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const levels = new Map(); // 'idNawyku|data' → poziom wody (%) z poprzedniego rysowania, żeby płynnie przelać do nowego
-  let userAct = false, hero = { k: null, v: null }, party = false, partyLater = false;
+  let userAct = false, hero = { k: null, v: null }, party = false, partyLater = false, timerDone = null;
   let edit = null;
   let rowMenu = null;
   let view = 'week';
@@ -200,10 +200,10 @@
       const vals = rows.filter(r => !['off', 'pre', 'future'].includes(r.s) && r.v != null).map(r => r.v);
       const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null, p = avg == null ? null : avg / h.target;
       const scale = Math.max(h.target, ...vals, 0.0001) * 1.15;
-      const bars = rows.map(r => {
+      const bars = rows.map((r, j) => {
         if (['off', 'pre'].includes(r.s)) return '<div class="sb none"><i></i></div>';
         if (r.s === 'future' || r.v == null) return `<div class="sb empty"><span>${r.s === 'future' ? '' : '–'}</span><i></i></div>`;
-        return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%;background:${heat(Math.min(1, r.v / h.target))}"></i></div>`;
+        return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}" style="--j:${j}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%;background:${heat(Math.min(1, r.v / h.target))}"></i></div>`;
       }).join('');
       head = [avg == null ? 'brak wpisów' : `średnia <b>${nf(+avg.toFixed(2))} ${esc(h.unit)}</b>`, p];
       chart = `<div class="sbars${month ? ' m' : ''}" style="--n:${dates.length}">${bars}<em class="starget" style="bottom:${h.target / scale * 100}%"><span>cel ${nf(h.target)}</span></em></div><div class="sdays${month ? ' m' : ''}" style="--n:${dates.length}">${dates.map(lbl).join('')}</div>`;
@@ -343,9 +343,12 @@
     if (later.length) html += `<div class="grp later" data-fk="g:later">Dodane później</div>` + later.map(rowHtml).join('');
     if (mobile && skipped.length) html += `<div class="grp later" data-fk="g:sk">Odpuszczone</div>` + skipped.map(skRowHtml).join('');
     const vw = $('view-week'), listEl = $('list');
-    vw.classList.remove('slide-l', 'slide-r'); listEl.classList.remove('enter');
-    if (slideDir || animList) void vw.offsetWidth; // wymusza restart animacji
-    if (slideDir) vw.classList.add(slideDir > 0 ? 'slide-l' : 'slide-r'); else if (animList) listEl.classList.add('enter');
+    // „Dzień dobry”: przy pierwszym otwarciu danego dnia kafelki wjeżdżają z odbiciem, zaległe migają swoim kolorem
+    let hello = false;
+    if (view === 'week' && !$('app-main').hidden) { try { hello = localStorage.getItem('hbtrack.hello') !== t; if (hello) localStorage.setItem('hbtrack.hello', t); } catch (_) { } }
+    vw.classList.remove('slide-l', 'slide-r'); listEl.classList.remove('enter', 'hello');
+    if (slideDir || animList || hello) void vw.offsetWidth; // wymusza restart animacji
+    if (hello) listEl.classList.add('hello'); else if (slideDir) vw.classList.add(slideDir > 0 ? 'slide-l' : 'slide-r'); else if (animList) listEl.classList.add('enter');
     listEl.innerHTML = html;
     afterList(listEl);
     animList = false; slideDir = 0; justCell = null;
@@ -362,11 +365,14 @@
     }
     function rowHtml(h) {
       const idx = rowIdx++;
-      const cells = shown.map(d => {
+      const cells = shown.map((d, i) => {
         const s = status(h, d), v = getVal(h, key(d));
+        // łańcuch: zrobiony dzień połączony linią z zrobionym następnym; nowe ogniwo dorysowuje się od strony świeżo odhaczonego dnia
+        const nd = !mobile && s === 'done' && shown[i + 1] && status(h, shown[i + 1]) === 'done' ? shown[i + 1] : null;
+        const lnc = !nd ? '' : ' ln' + (justCell?.h === h.id ? justCell.k === key(d) ? ' ln-r' : justCell.k === key(nd) ? ' ln-l' : '' : '');
         const dis = s === 'future' || s === 'off' || s === 'pre';
         const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
-        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))};--lv:${waterLevel(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
+        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}${lnc}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))};--lv:${waterLevel(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
       }).join('');
       const open = rowMenu === h.id;
       const acts = open
@@ -624,7 +630,7 @@
     try { localStorage.removeItem(TIMER_KEY); } catch (_) { }
     const h = state.habits.find(x => x.id === t.hid); if (!h) { render(); return; }
     if (finish) {
-      setVal(h, t.k, h.target); justCell = { h: h.id, k: t.k };
+      setVal(h, t.k, h.target); justCell = { h: h.id, k: t.k }; timerDone = h.id;
       navigator.vibrate?.([80, 60, 80]);
       toast(`${h.name}: zrobione`);
       if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification("Grochu's tracker", { body: `${h.name}: czas minął — zrobione ✓`, icon: 'icons/icon-192.png' }); } catch (_) { } }
@@ -883,15 +889,33 @@
       { duration: 650, delay: 120 + i * 80, easing: 'ease-out' }));
   }
   // Po przebudowie listy: woda przelewa się ze starego poziomu, iskry, ewentualne świętowanie.
+  const waterTop = l => `${(9 + (100 - l) * .88).toFixed(2)}%`; // jak w CSS: w środku obwódki, z zapasem na falę
+  // Kółko liczbowe osiąga cel: woda dolewa się do pełna, dopiero potem pojawia się ptaszek.
+  function fillUp(c, was) {
+    c.classList.add('filling'); c.insertAdjacentHTML('afterbegin', WATER);
+    const ws = [...c.querySelectorAll('.wv')];
+    const a = ws.map(w => w.animate({ top: [waterTop(was), '-30%'] }, { duration: 560, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' }));
+    let done = false;
+    const end = () => { if (done) return; done = true; ws.forEach(w => w.remove()); c.classList.remove('filling', 'just'); void c.offsetWidth; c.classList.add('just'); };
+    a[0].onfinish = end; setTimeout(end, 900); // zapas, gdy karta w tle wstrzyma animacje
+  }
   function afterList(el) {
+    let filled = null;
     el.querySelectorAll('.c[data-lv]').forEach(c => {
       const p = +c.style.getPropertyValue('--lv'), was = levels.get(c.dataset.lv);
       levels.set(c.dataset.lv, p);
       if (was == null || was === p || calm()) return;
-      const top = l => `${(9 + (100 - l) * .88).toFixed(2)}%`; // jak w CSS: w środku obwódki, z zapasem na falę
+      if (c.classList.contains('done')) { if (!document.hidden) { fillUp(c, was); filled = c; } return; }
+      const top = waterTop;
       c.querySelectorAll('.wv').forEach(w => w.animate({ top: [top(was), top(p)] }, { duration: 650, easing: 'cubic-bezier(.3,.7,.3,1)' }));
     });
-    if (justCell) { const c = el.querySelector(`.ob[data-h="${CSS.escape(justCell.h)}"][data-k="${justCell.k}"] .c.done`); if (c) sparks(c); }
+    if (justCell) { const c = el.querySelector(`.ob[data-h="${CSS.escape(justCell.h)}"][data-k="${justCell.k}"] .c.done`); if (c) { if (c === filled) setTimeout(() => sparks(c), 560); else sparks(c); } }
+    // koniec timera: jedno spokojne, zielone pulsowanie kafelka
+    if (timerDone) {
+      const r = el.querySelector(`.o-row[data-id="${CSS.escape(timerDone)}"]`); timerDone = null;
+      const off = '0 0 0 0 rgba(74,222,128,0), inset 0 0 0 1px rgba(74,222,128,0)';
+      if (r && !calm()) r.animate({ boxShadow: [off, '0 0 36px 4px rgba(74,222,128,.28), inset 0 0 0 1px rgba(74,222,128,.7)', off] }, { duration: 1600, easing: 'ease-in-out' });
+    }
     // przy otwartym edytorze świętowanie czeka na jego zamknięcie
     if (party) { party = false; if (overlay.firstChild) partyLater = true; else celebrate(); }
     userAct = false;
