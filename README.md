@@ -32,6 +32,7 @@ W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (k
 
 ## Obsługa
 
+- Procent: każdy zaplanowany nawyk ma równą wagę; tak/nie daje całość albo nic, liczbowy proporcjonalnie (2 h z 10 h = 20% swojej części, najwyżej 100%).
 - Na telefonie nie da się przybliżać ani przesuwać ekranu w bok.
 - Animacje: wejście listy po nawigacji, przesunięcie przy zmianie dnia/tygodnia, „pyknięcie” i rysowany ptaszek przy odhaczeniu, płynny licznik %, okienka i powiadomienia. Wyłączają się przy systemowym „ogranicz ruch”.
 - **+ Dodaj** dodaje nawyk: tak/nie albo liczbowy (cel dzienny, jednostka, krok +/−), z wyborem dni i pory dnia.

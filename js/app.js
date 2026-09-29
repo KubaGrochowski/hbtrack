@@ -8,7 +8,6 @@
   const MONTHS_NOM = ['Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec', 'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'];
   const MONTHS_GEN = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
   const ALL = [0, 1, 2, 3, 4, 5, 6];
-  const SCORE = { done: 1, part: 0.5, miss: 0 };
   const TIMES = [['am', 'Rano'], ['pm', 'Popołudnie'], ['eve', 'Wieczór']];
 
   /* ---------- daty ---------- */
@@ -100,11 +99,14 @@
   const tgt = h => { const per = h.days.length === 7 ? 'codziennie' : h.days.map(d => DAYS[d]).join(' '); return h.type === 'bool' ? per : `${nf(h.target)} ${h.unit} · ${per}`; };
   const weekDates = (ws = weekStart) => ALL.map(i => addDays(ws, i));
 
-  // Jeden wzór dla wszystkich procentów: suma punktów ÷ liczba zaplanowanych wpisów do dziś włącznie
-  // (zrobione = 1, częściowo = ½, dzisiejsze bez wpisu = 0). Dni przyszłe się nie liczą.
+  // Jeden wzór dla wszystkich procentów: każdy zaplanowany nawyk ma równą wagę, suma postępów ÷ liczba nawyków do dziś włącznie
+  // (tak/nie: 1 albo 0; liczbowy: wartość ÷ cel, najwyżej 1; bez wpisu = 0). Dni przyszłe się nie liczą.
   function periodPct(dates) {
     let n = 0, s = 0;
-    dates.forEach(d => habitsActive().forEach(h => { const st = status(h, d); if (!(st in SCORE) && st !== 'pending') return; n++; s += SCORE[st] || 0; }));
+    dates.forEach(d => habitsActive().forEach(h => {
+      const st = status(h, d); if (!['done', 'part', 'miss', 'pending'].includes(st)) return;
+      n++; s += prog(h, getVal(h, key(d))); // nawyk liczbowy liczy się proporcjonalnie: 2 h z 10 h = 20% swojej części
+    }));
     return n ? s / n : null;
   }
   const dayPct = d => periodPct([d]);
