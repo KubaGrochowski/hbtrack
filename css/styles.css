@@ -416,8 +416,8 @@ button:not(:disabled):active{transform:scale(.96)}
 .odr:hover{color:var(--accent)}
 
 /* woda w kółku nawyku liczbowego: poziom = % celu, fala się kołysze */
-.c .wv{position:absolute;left:-50%;width:200%;height:200%;top:calc((100 - var(--p))*1%);border-radius:43%;background:var(--accent);z-index:-1;animation:wave 5.5s linear infinite}
-.c .wv.b{background:color-mix(in srgb,var(--accent) 45%,transparent);border-radius:40%;margin-top:-3px;animation-duration:8s;animation-direction:reverse}
+.c .wv{position:absolute;left:-50%;width:200%;height:200%;top:calc(9% + (100 - var(--lv))*.88%);border-radius:43%;background:var(--accent);z-index:-1;animation:wave 5.5s linear infinite}
+.c .wv.b{background:color-mix(in srgb,var(--accent) 45%,transparent);border-radius:40%;margin-top:-2px;animation-duration:8s;animation-direction:reverse}
 @keyframes wave{to{transform:rotate(360deg)}}
 
 /* iskry przy odhaczeniu */

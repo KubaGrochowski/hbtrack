@@ -143,6 +143,13 @@
   const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
   const CLOCK = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const STOP = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="currentColor"/></svg>';
+  // Wysokość wody w kółku tak, żeby zalana POWIERZCHNIA koła odpowiadała % celu (90% celu ≈ 84% wysokości, nie prawie pełne).
+  const waterLevel = f => {
+    if (f <= 0 || f >= 1) return f * 100;
+    let lo = 0, hi = Math.PI * 2;
+    for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if ((m - Math.sin(m)) / (2 * Math.PI) < f) lo = m; else hi = m; }
+    return +((1 - Math.cos(lo / 2)) / 2 * 100).toFixed(1);
+  };
   const WATER = '<i class="wv"></i><i class="wv b"></i>';
   const FLAME = '<svg width="11" height="13" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 .5c.4 2.4 3.8 3.9 3.8 7.6a3.8 3.8 0 0 1-7.6 0c0-1.5.8-2.6 1.6-3.3.1 1.2.7 2 1.5 2.3C5 5.1 5.1 2.6 6 .5z" fill="currentColor"/></svg>';
 
@@ -347,7 +354,7 @@
     function odRowHtml({ h, d, k, age }) {
       const idx = rowIdx++, s = status(h, d), v = getVal(h, k), yKey = k, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
       const sub = h.type === 'num' ? `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}` : 'nie zrobione';
-      return `<div class="o-row od${age === 2 ? ' old' : ''}" data-fk="od:${h.id}|${k}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}"${h.type === 'num' ? ` data-lv="${h.id}|${k}"` : ''} style="--p:${pct(prog(h, v))}">${s === 'part' ? WATER : ''}</span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
+      return `<div class="o-row od${age === 2 ? ' old' : ''}" data-fk="od:${h.id}|${k}" style="--i:${idx}"><div class="name"><div class="nt"><b><span class="nm">${esc(h.name)}</span><span class="odtag">z ${when}</span></b><small>${sub}</small></div></div><div class="o-track"><button class="ob ${s}" data-h="${h.id}" data-k="${yKey}" data-od aria-label="Nadrób: ${esc(h.name)}, ${when}"><span class="c ${s}"${h.type === 'num' ? ` data-lv="${h.id}|${k}"` : ''} style="--p:${pct(prog(h, v))};--lv:${waterLevel(prog(h, v))}">${s === 'part' ? WATER : ''}</span></button></div><div class="rmenu"><button class="dots odx" data-skip="${h.id}|${yKey}" aria-label="Odpuść: ${esc(h.name)}">${XMARK}</button></div></div>`;
     }
     function skRowHtml({ h, k, age }) {
       const idx = rowIdx++, when = age === 2 ? 'przedwczoraj' : 'wczoraj';
@@ -359,7 +366,7 @@
         const s = status(h, d), v = getVal(h, key(d));
         const dis = s === 'future' || s === 'off' || s === 'pre';
         const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
-        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
+        return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))};--lv:${waterLevel(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
       }).join('');
       const open = rowMenu === h.id;
       const acts = open
@@ -878,10 +885,11 @@
   // Po przebudowie listy: woda przelewa się ze starego poziomu, iskry, ewentualne świętowanie.
   function afterList(el) {
     el.querySelectorAll('.c[data-lv]').forEach(c => {
-      const p = +c.style.getPropertyValue('--p'), was = levels.get(c.dataset.lv);
+      const p = +c.style.getPropertyValue('--lv'), was = levels.get(c.dataset.lv);
       levels.set(c.dataset.lv, p);
       if (was == null || was === p || calm()) return;
-      c.querySelectorAll('.wv').forEach(w => w.animate({ top: [`${100 - was}%`, `${100 - p}%`] }, { duration: 650, easing: 'cubic-bezier(.3,.7,.3,1)' }));
+      const top = l => `${(9 + (100 - l) * .88).toFixed(2)}%`; // jak w CSS: w środku obwódki, z zapasem na falę
+      c.querySelectorAll('.wv').forEach(w => w.animate({ top: [top(was), top(p)] }, { duration: 650, easing: 'cubic-bezier(.3,.7,.3,1)' }));
     });
     if (justCell) { const c = el.querySelector(`.ob[data-h="${CSS.escape(justCell.h)}"][data-k="${justCell.k}"] .c.done`); if (c) sparks(c); }
     // przy otwartym edytorze świętowanie czeka na jego zamknięcie
