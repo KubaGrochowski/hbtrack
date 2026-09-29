@@ -490,6 +490,8 @@
       <div class="field"><label for="f-name">Nazwa</label><input id="f-name" type="text" required maxlength="30" value="${h ? esc(h.name) : ''}"></div>
       <div class="field"><span class="lab">Rodzaj</span><div class="seg"><label><input type="radio" name="f-type" id="f-type-bool" value="bool" ${!h || h.type === 'bool' ? 'checked' : ''}><span>Tak / nie</span></label><label><input type="radio" name="f-type" id="f-type-num" value="num" ${h && h.type === 'num' ? 'checked' : ''}><span>Liczbowy</span></label></div></div>
       <div class="row3" id="f-numfields"><div class="field"><label for="f-target">Cel dzienny</label><input id="f-target" type="number" min="0.01" step="any" value="${h?.target ?? ''}"></div><div class="field"><label for="f-unit">Jednostka</label><input id="f-unit" type="text" value="${h ? esc(h.unit) : ''}" maxlength="10"></div><div class="field"><label for="f-step">Krok +/−</label><input id="f-step" type="number" min="0.01" step="any" value="${h?.step ?? 1}"></div></div>
+      <div class="field"><span class="lab">Timer</span><div class="seg seg3">${[['', 'Wył.'], ['min', 'Minuty'], ['h', 'Godziny']].map(([v, l]) => `<label><input type="radio" name="f-timer" value="${v}" ${(h ? timerOf(h) : '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+      <div class="field" id="f-durfield"><label for="f-dur">Czas</label><input id="f-dur" type="number" min="0.01" step="any" value="${h?.dur ?? ''}"></div>
       <div class="field"><div class="daypick" role="group" aria-label="Dni nawyku">${DAYS.map((d, i) => `<label><input type="checkbox" id="f-d${i}" value="${i}" ${days.includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div><button type="button" class="allweek" id="f-all">Cały tydzień</button></div>
       <div class="field"><span class="lab">Pora</span><div class="seg seg4">${[['', '—'], ...TIMES].map(([v, l]) => `<label><input type="radio" name="f-time" id="f-time-${v || 'any'}" value="${v}" ${(h?.time || '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
       <button class="primary" type="submit">${h ? 'Zapisz' : 'Dodaj'}</button>
@@ -497,8 +499,13 @@
     </form>`;
     overlay.innerHTML = sheet(h ? 'Edytuj nawyk' : 'Nowy nawyk', '', body);
     const f = $('hform');
-    const sync = () => { $('f-numfields').hidden = f.querySelector('input[name="f-type"]:checked').value === 'bool'; };
-    f.querySelectorAll('input[name="f-type"]').forEach(r => r.addEventListener('change', sync)); sync();
+    const sync = () => {
+      const bool = f.querySelector('input[name="f-type"]:checked').value === 'bool', tm = f.querySelector('input[name="f-timer"]:checked').value;
+      $('f-numfields').hidden = bool;
+      $('f-durfield').hidden = !bool || !tm; // tak/nie: ile trwa; liczbowy: timer odlicza do celu
+      $('f-unit').readOnly = !bool && !!tm; if (!bool && tm) $('f-unit').value = tm; // liczbowy z timerem liczy w minutach albo godzinach
+    };
+    f.querySelectorAll('input[name="f-type"], input[name="f-timer"]').forEach(r => r.addEventListener('change', sync)); sync();
     f.style.display = 'flex'; f.style.flexDirection = 'column'; f.style.gap = '16px';
     $('f-all').addEventListener('click', () => f.querySelectorAll('.daypick input').forEach(x => { x.checked = true; }));
     f.addEventListener('submit', e => {
@@ -513,9 +520,12 @@
       const step = Math.max(0.01, parseFloat($('f-step').value) || 1);
       const unit = $('f-unit').value.trim();
       const time = f.querySelector('input[name="f-time"]:checked')?.value || '';
+      const tmr = f.querySelector('input[name="f-timer"]:checked')?.value || '', dur = parseFloat($('f-dur').value);
+      if (type === 'bool' && tmr && !(dur > 0)) { toast('Podaj czas'); $('f-dur').focus(); return; }
       // nawyk obowiązuje od dnia dodania; wcześniejsze dni pokazują „?”
       const target_ = h || { id: 'h' + Date.now().toString(36), created: todayKey() };
-      Object.assign(target_, { name, type, target, step, unit, days: sel });
+      Object.assign(target_, { name, type, target, step, unit, days: sel, timer: tmr });
+      if (type === 'bool' && tmr) target_.dur = dur; else delete target_.dur;
       if (time) target_.time = time; else delete target_.time;
       if (!h) state.habits.push(target_);
       save(); close(); render(); toast(h ? 'Zapisano' : `Dodano „${name}”`);
@@ -611,12 +621,16 @@
   const TIMER_KEY = 'hbtrack.timer';
   const readTimer = () => { try { return JSON.parse(localStorage.getItem(TIMER_KEY)); } catch (_) { return null; } };
   let timer = readTimer(), timerInt = null;
-  const timeUnit = h => h.type === 'num' ? (/^(min|minut[ay]?)$/i.test(h.unit) ? 60 : /^(h|godz.?|godzin[ay]?)$/i.test(h.unit) ? 3600 : 0) : 0;
+  const guessTimer = h => h.type === 'num' ? (/^(min|minut[ay]?)$/i.test(h.unit) ? 'min' : /^(h|godz.?|godzin[ay]?)$/i.test(h.unit) ? 'h' : '') : '';
+  const timerOf = h => h.timer !== undefined ? h.timer : guessTimer(h);
+  const timeUnit = h => { const t = timerOf(h); return t === 'min' ? 60 : t === 'h' ? 3600 : 0; };
+  // nawyk tak/nie z timerem: czas z kreatora (h.dur); liczbowy: brakująca część celu
+  const timerGoal = h => h.type === 'bool' ? (h.dur || 0) : h.target;
   const timerLeft = () => timer ? Math.max(0, timer.seconds - (Date.now() - timer.startedAt) / 1000) : 0;
   const fmtLeft = sec => { const s = Math.ceil(sec), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + pad(mm) : mm) + ':' + pad(ss); };
   function startTimer(h) {
     if (timer) stopTimer(false);
-    const k = todayKey(), unit = timeUnit(h), base = getVal(h, k) || 0, need = Math.round((h.target - base) * unit);
+    const k = todayKey(), unit = timeUnit(h), base = h.type === 'bool' ? 0 : getVal(h, k) || 0, need = Math.round((timerGoal(h) - base) * unit);
     if (!unit || need <= 0) return;
     timer = { hid: h.id, k, startedAt: Date.now(), seconds: need, base, unit };
     try { localStorage.setItem(TIMER_KEY, JSON.stringify(timer)); } catch (_) { }
@@ -630,13 +644,13 @@
     try { localStorage.removeItem(TIMER_KEY); } catch (_) { }
     const h = state.habits.find(x => x.id === t.hid); if (!h) { render(); return; }
     if (finish) {
-      setVal(h, t.k, h.target); justCell = { h: h.id, k: t.k }; timerDone = h.id;
+      setVal(h, t.k, h.type === 'bool' ? 1 : h.target); justCell = { h: h.id, k: t.k }; timerDone = h.id;
       navigator.vibrate?.([80, 60, 80]);
       toast(`${h.name}: zrobione`);
       if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification("Grochu's tracker", { body: `${h.name}: czas minął — zrobione ✓`, icon: 'icons/icon-192.png' }); } catch (_) { } }
     } else {
       const done = Math.min(t.seconds, (Date.now() - t.startedAt) / 1000), add = t.unit === 60 ? Math.round(done / 60) : Math.round(done / 3600 * 100) / 100; // minuty w całościach, godziny do 0,01
-      if (add > 0) { setVal(h, t.k, Math.min(h.target, +(t.base + add).toFixed(2))); justCell = { h: h.id, k: t.k }; }
+      if (add > 0 && h.type === 'num') { setVal(h, t.k, Math.min(h.target, +(t.base + add).toFixed(2))); justCell = { h: h.id, k: t.k }; }
     }
     render();
   }
@@ -654,7 +668,7 @@
     if (!timer || view !== 'week') { card.hidden = true; return; }
     const h = state.habits.find(x => x.id === timer.hid); if (!h) { card.hidden = true; return; }
     card.hidden = false;
-    card.innerHTML = `<div class="tinfo"><b>${esc(h.name)}</b><small>cel ${nf(h.target)} ${esc(h.unit)}</small></div><div class="ttime" data-timer-left>${fmtLeft(timerLeft())}</div><button class="tstop" data-timer-stop>${STOP} Stop</button><div class="tbar"><i style="width:${100 - timerLeft() / timer.seconds * 100}%"></i></div>`;
+    card.innerHTML = `<div class="tinfo"><b>${esc(h.name)}</b><small>${h.type === 'bool' ? `${nf(timerGoal(h))} ${timerOf(h)}` : `cel ${nf(h.target)} ${esc(h.unit)}`}</small></div><div class="ttime" data-timer-left>${fmtLeft(timerLeft())}</div><button class="tstop" data-timer-stop>${STOP} Stop</button><div class="tbar"><i style="width:${100 - timerLeft() / timer.seconds * 100}%"></i></div>`;
   }
 
   /* ---------- zdarzenia ---------- */

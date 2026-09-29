@@ -466,3 +466,6 @@ button:not(:disabled):active{transform:scale(.96)}
 /* kółko liczbowe osiąga cel: dolewanie do pełna */
 .c.done.filling{background:var(--surface-2);overflow:hidden;isolation:isolate;animation:none}
 .c.done.filling svg{visibility:hidden}
+
+.seg.seg3{grid-template-columns:repeat(3,1fr)}
+.field input[readonly]{color:var(--ink-2)}
