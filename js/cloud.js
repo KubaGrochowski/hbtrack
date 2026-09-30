@@ -1,7 +1,7 @@
 /* Grochu's tracker — konto i synchronizacja z Supabase na żywo (logowanie e-mailem i hasłem, Realtime).
    Bez zewnętrznych bibliotek: Supabase Auth (GoTrue) i REST (PostgREST) przez fetch.
 
-   Model synchronizacji: stan aplikacji jest spłaszczany do elementów (nawyk, wpis, notatka, kolejność, start, posiłek, zjedzony posiłek, zapotrzebowanie).
+   Model synchronizacji: stan aplikacji jest spłaszczany do elementów (nawyk, wpis, notatka, kolejność, start).
    Każdy element ma znacznik czasu ostatniej zmiany; przy łączeniu wygrywa nowszy (także usunięcia).
    W chmurze jest jeden wiersz na użytkownika: tabela user_data (user_id, data jsonb, updated_at). */
 (() => {
@@ -25,9 +25,6 @@
     Object.keys(s.skips || {}).forEach(k => { items['k:' + k] = 1; }); // odpuszczone zaległości: 'idNawyku|data'
     Object.entries(s.spent || {}).forEach(([k, v]) => { if (v) items['p:' + k] = v; }); // zatrzymany timer: 'idNawyku|data' → sekundy
     Object.entries(s.breaks || {}).forEach(([k, v]) => { items['b:' + k] = v; }); // przerwy: id → { from, to }
-    Object.entries(s.meals || {}).forEach(([k, v]) => { items['m:' + k] = v; }); // posiłki (przepisy): id → { name, items, photo }
-    Object.entries(s.food || {}).forEach(([day, es]) => Object.entries(es).forEach(([id, v]) => { items[`f:${day}|${id}`] = v; })); // zjedzone: 'dzień|idWpisu'
-    if (s.goals) items.goals = s.goals; // zapotrzebowanie kcal i makro
     return items;
   }
   function unflatten(items) {
@@ -35,17 +32,15 @@
     Object.keys(items).forEach(k => { if (k.startsWith('h:')) habitsById[k.slice(2)] = items[k]; });
     const order = (items.order || []).filter(id => habitsById[id]);
     Object.keys(habitsById).forEach(id => { if (!order.includes(id)) order.push(id); });
-    const entries = {}, notes = {}, skips = {}, spent = {}, breaks = {}, meals = {}, food = {};
+    const entries = {}, notes = {}, skips = {}, spent = {}, breaks = {};
     Object.keys(items).forEach(k => {
       if (k.startsWith('e:')) { const [hid, day] = k.slice(2).split('|'); if (habitsById[hid]) (entries[hid] ??= {})[day] = items[k]; }
       else if (k.startsWith('n:')) notes[k.slice(2)] = items[k];
       else if (k.startsWith('k:')) { if (habitsById[k.slice(2).split('|')[0]]) skips[k.slice(2)] = 1; }
       else if (k.startsWith('b:')) breaks[k.slice(2)] = items[k];
-      else if (k.startsWith('m:')) meals[k.slice(2)] = items[k];
-      else if (k.startsWith('f:')) { const [day, id] = k.slice(2).split('|'); (food[day] ??= {})[id] = items[k]; }
       else if (k.startsWith('p:')) { if (habitsById[k.slice(2).split('|')[0]]) spent[k.slice(2)] = items[k]; }
     });
-    return { start: items.start, habits: order.map(id => habitsById[id]), entries, notes, skips, spent, breaks, meals, food, goals: items.goals || null };
+    return { start: items.start, habits: order.map(id => habitsById[id]), entries, notes, skips, spent, breaks };
   }
   // Porównanie niezależne od kolejności kluczy (inaczej te same dane uchodziły za różne i synchronizacja kręciła się w kółko).
   const canon = v => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
