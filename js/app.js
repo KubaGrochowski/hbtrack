@@ -334,10 +334,12 @@
     // Zaległe z wczoraj: tylko nawyki tak/nie, które nie są codzienne, niezrobione i nieodpuszczone (liczbowe i codzienne nie trafiają do zaległych). Telefon: osobna sekcja na górze dzisiejszego dnia; komputer: plakietka przy nazwie.
     // Sięgają dwa dni wstecz: wczorajsze są pomarańczowe, przedwczorajsze (nienadrobione) czerwone.
     const showOverdue = mobile ? key(selDay) === t : key(dates[0]) <= t && t <= key(end);
+    // nawyk ma już kolejny termin między tamtym dniem a dziś (np. siłownia pn i wt) — wtedy zaległość traci sens
+    const nextDue = (h, age) => { for (let i = age - 1; i >= 0; i--) if (h.days.includes(dow(addDays(dayOnly(new Date()), -i)))) return true; return false; };
     const overdue = [], skipped = []; // skipped: odpuszczone krzyżykiem, do przywrócenia z dołu listy
     if (showOverdue) for (const age of [2, 1]) {
       const d = addDays(dayOnly(new Date()), -age), k = key(d);
-      hs.forEach(h => { if (h.type !== 'num' && h.days.length < 7 && ['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
+      hs.forEach(h => { if (h.type !== 'num' && h.days.length < 7 && !nextDue(h, age) && ['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
     }
     let rowIdx = 0;
     let html = mobile && overdue.length ? `<div class="grp later od-h" data-fk="g:od">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep" data-fk="g:od-sep"></div>` : '';
