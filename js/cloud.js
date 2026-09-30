@@ -24,6 +24,7 @@
     Object.entries(s.notes || {}).forEach(([k, v]) => { if (v) items['n:' + k] = v; });
     Object.keys(s.skips || {}).forEach(k => { items['k:' + k] = 1; }); // odpuszczone zaległości: 'idNawyku|data'
     Object.entries(s.spent || {}).forEach(([k, v]) => { if (v) items['p:' + k] = v; }); // zatrzymany timer: 'idNawyku|data' → sekundy
+    Object.entries(s.breaks || {}).forEach(([k, v]) => { items['b:' + k] = v; }); // przerwy: id → { from, to }
     return items;
   }
   function unflatten(items) {
@@ -31,14 +32,15 @@
     Object.keys(items).forEach(k => { if (k.startsWith('h:')) habitsById[k.slice(2)] = items[k]; });
     const order = (items.order || []).filter(id => habitsById[id]);
     Object.keys(habitsById).forEach(id => { if (!order.includes(id)) order.push(id); });
-    const entries = {}, notes = {}, skips = {}, spent = {};
+    const entries = {}, notes = {}, skips = {}, spent = {}, breaks = {};
     Object.keys(items).forEach(k => {
       if (k.startsWith('e:')) { const [hid, day] = k.slice(2).split('|'); if (habitsById[hid]) (entries[hid] ??= {})[day] = items[k]; }
       else if (k.startsWith('n:')) notes[k.slice(2)] = items[k];
       else if (k.startsWith('k:')) { if (habitsById[k.slice(2).split('|')[0]]) skips[k.slice(2)] = 1; }
+      else if (k.startsWith('b:')) breaks[k.slice(2)] = items[k];
       else if (k.startsWith('p:')) { if (habitsById[k.slice(2).split('|')[0]]) spent[k.slice(2)] = items[k]; }
     });
-    return { start: items.start, habits: order.map(id => habitsById[id]), entries, notes, skips, spent };
+    return { start: items.start, habits: order.map(id => habitsById[id]), entries, notes, skips, spent, breaks };
   }
   // Porównanie niezależne od kolejności kluczy (inaczej te same dane uchodziły za różne i synchronizacja kręciła się w kółko).
   const canon = v => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;

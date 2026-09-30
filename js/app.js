@@ -29,6 +29,7 @@
     if (!s.notes || typeof s.notes !== 'object') s.notes = {};
     if (!s.skips || typeof s.skips !== 'object') s.skips = {};
     if (!s.spent || typeof s.spent !== 'object') s.spent = {};
+    if (!s.breaks || typeof s.breaks !== 'object') s.breaks = {}; // przerwy (urlop, choroba): id → { from, to }
     Object.keys(s.spent).forEach(k => { if ((k.split('|')[1] || '') < todayKey()) delete s.spent[k]; });
     // odpuszczone zaległości starsze niż tydzień nie są już potrzebne
     const old = key(addDays(new Date(), -7));
@@ -49,7 +50,7 @@
   let animList = true, slideDir = 0, justCell = null;
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const levels = new Map(); // 'idNawyku|data' → poziom wody (%) z poprzedniego rysowania, żeby płynnie przelać do nowego
-  let userAct = false, hero = { k: null, v: null }, party = false, partyLater = false, timerDone = null;
+  let userAct = false, hero = { k: null, v: null }, party = false, partyLater = false, timerDone = null, recordToast = null;
   let edit = null;
   let rowMenu = null;
   let view = 'week';
@@ -75,7 +76,7 @@
   }
   // Stan z chmury (po synchronizacji): zapis lokalny bez oznaczania go jako zmiany z tego urządzenia.
   function applyState(s) {
-    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, skips: s.skips || {}, spent: s.spent || {}, start: s.start });
+    state = withStart({ habits: s.habits || [], entries: s.entries || {}, notes: s.notes || {}, skips: s.skips || {}, spent: s.spent || {}, breaks: s.breaks || {}, start: s.start });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
     render();
   }
@@ -90,19 +91,35 @@
 
   /* ---------- logika ---------- */
   const prog = (h, v) => v == null ? 0 : h.type === 'bool' ? (v >= 1 ? 1 : 0) : Math.min(1, v / h.target);
+  // Przerwa: dni wolne od wszystkich nawyków — nie liczą się do procentów, nie przerywają serii, nie dają zaległości.
+  const breakAt = k => Object.values(state.breaks || {}).find(b => b.from <= k && k <= b.to) || null;
+  // „X razy w tygodniu”: ile razy zrobione w tygodniu dnia d (przed d albo do dziś włącznie)
+  function weekDone(h, d, before) {
+    const ws = startOfWeek(d), t = todayKey(), lim = before ? key(d) : t; let n = 0;
+    for (let i = 0; i < 7; i++) { const k = key(addDays(ws, i)); if (k > lim || (before && k === lim)) break; if (prog(h, getVal(h, k)) >= 1) n++; }
+    return n;
+  }
   function status(h, d) {
     const k = key(d), t = todayKey();
     if (k < h.created) return 'pre'; // nawyku jeszcze nie było
     if (!h.days.includes(dow(d))) return 'off';
+    if (breakAt(k)) return 'rest';
     if (k > t) return 'future';
     const v = getVal(h, k);
-    if (h.type === 'bool') { if (v === 1) return 'done'; if (v === 0) return 'miss'; return k === t ? 'pending' : 'miss'; }
-    if (v == null || v === 0) return k === t ? 'pending' : 'miss';
-    return v >= h.target ? 'done' : 'part';
+    let st;
+    if (h.type === 'bool') st = v === 1 ? 'done' : v === 0 ? 'miss' : k === t ? 'pending' : 'miss';
+    else st = v == null || v === 0 ? (k === t ? 'pending' : 'miss') : v >= h.target ? 'done' : 'part';
+    // X razy w tygodniu: niezrobiony dzień jest „dowolny”, chyba że inaczej nie da się już zmieścić limitu w tygodniu
+    if (h.freq && (st === 'miss' || st === 'pending')) {
+      if (weekDone(h, d, false) >= h.freq) return 'free';
+      const need = h.freq - weekDone(h, d, true), left = 7 - dow(d);
+      if (need < left) return 'free';
+    }
+    return st;
   }
   const nf = v => v.toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const fmt = (h, v) => v == null ? '' : h.type === 'bool' ? (v >= 1 ? '✓' : '✕') : v >= 1000 ? (v / 1000).toLocaleString('pl-PL', { maximumFractionDigits: 1 }) + 'k' : nf(v);
-  const tgt = h => { const per = h.days.length === 7 ? 'codziennie' : h.days.map(d => DAYS[d]).join(' '); return h.type === 'bool' ? per : `${nf(h.target)} ${h.unit} · ${per}`; };
+  const tgt = h => { const per = h.freq ? `${h.freq}× w tygodniu` : h.days.length === 7 ? 'codziennie' : h.days.map(d => DAYS[d]).join(' '); return h.type === 'bool' ? per : `${nf(h.target)} ${h.unit} · ${per}`; };
   const weekDates = (ws = weekStart) => ALL.map(i => addDays(ws, i));
 
   // Jeden wzór dla wszystkich procentów: każdy zaplanowany nawyk ma równą wagę, suma postępów ÷ liczba nawyków do dziś włącznie
@@ -122,10 +139,32 @@
     const start = fromKey(h.created || state.start);
     for (let d = dayOnly(new Date()); d >= start; d = addDays(d, -1)) {
       const s = status(h, d);
-      if (s === 'off' || s === 'pre' || s === 'pending') continue;
+      if (s === 'off' || s === 'pre' || s === 'pending' || s === 'rest' || s === 'free') continue;
       if (s === 'done') n++; else break;
     }
     return n;
+  }
+  // Rekord serii: najdłuższa seria w historii; prior = najlepsza z serii już zakończonych (do wykrycia nowego rekordu)
+  function bestStreak(h) {
+    let cur = 0, best = 0, prior = 0;
+    const t = dayOnly(new Date());
+    for (let d = fromKey(h.created || state.start); d <= t; d = addDays(d, 1)) {
+      const s = status(h, d);
+      if (s === 'done') { cur++; best = Math.max(best, cur); }
+      else if (s === 'miss' || s === 'part') { prior = Math.max(prior, cur); cur = 0; }
+    }
+    return { best, prior };
+  }
+  // Najsłabszy dzień tygodnia: dzień z największym odsetkiem niezrobionych (min. 2 próby), bez dzisiaj
+  function weakestDay(h) {
+    const n = ALL.map(() => [0, 0]), t = dayOnly(new Date());
+    for (let d = fromKey(h.created || state.start); d < t; d = addDays(d, 1)) {
+      const s = status(h, d); if (!['done', 'part', 'miss'].includes(s)) continue;
+      n[dow(d)][1]++; if (s !== 'done') n[dow(d)][0]++;
+    }
+    let best = -1, rate = 0;
+    n.forEach(([f, c], i) => { if (c >= 2 && f && (f / c > rate || (f / c === rate && f > n[best][0]))) { best = i; rate = f / c; } });
+    return best;
   }
   const noteOf = k => state.notes[k] || '';
   function setNote(k, text) {
@@ -134,7 +173,7 @@
     save();
   }
   // [zrobione, zaplanowane] dla danego dnia
-  function dayDone(d) { const hs = habitsActive().filter(h => !['off', 'pre'].includes(status(h, d))); return [hs.filter(h => status(h, d) === 'done').length, hs.length]; }
+  function dayDone(d) { const hs = habitsActive().filter(h => !['off', 'pre', 'rest', 'free'].includes(status(h, d))); return [hs.filter(h => status(h, d) === 'done').length, hs.length]; }
   const pct = p => Math.round(p * 100);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const CHECK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -154,6 +193,10 @@
     return +((1 - Math.cos(lo / 2)) / 2 * 100).toFixed(1);
   };
   const WATER = '<i class="wv"></i><i class="wv b"></i>';
+  // Fale (morski motyw): ścieżka dłuższa niż widok, przesuwana w pętli o pełne okresy
+  const wavePath = (amp, len) => { let d = 'M0 20'; for (let x = 0; x < 400; x += len) d += ` Q${x + len / 4} ${20 - amp} ${x + len / 2} 20 T${x + len} 20`; return d + ' V40 H0 Z'; };
+  const SEA_SVG = `<svg class="waves" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true"><path class="w1" d="${wavePath(5, 50)}"/><path class="w2" d="${wavePath(7, 100)}" transform="translate(0 3)"/><path class="w3" d="${wavePath(3, 50)}" transform="translate(0 9)"/></svg>`;
+  const BOAT = '<svg width="26" height="24" viewBox="0 0 26 24" aria-hidden="true"><path d="M12 2v14H4z" fill="currentColor" opacity=".9"/><path d="M14 5v11h7z" fill="currentColor" opacity=".55"/><path d="M2 18h22l-3 4H6z" fill="currentColor"/></svg>';
   const FLAME = '<svg width="11" height="13" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 .5c.4 2.4 3.8 3.9 3.8 7.6a3.8 3.8 0 0 1-7.6 0c0-1.5.8-2.6 1.6-3.3.1 1.2.7 2 1.5 2.3C5 5.1 5.1 2.6 6 .5z" fill="currentColor"/></svg>';
 
   /* ---------- kalendarz ---------- */
@@ -173,7 +216,7 @@
     days.forEach((d, idx) => {
       const k = key(d), fut = k > t, pre = k < state.start, p = fut || pre ? null : dayPct(d);
       const note = noteOf(k);
-      const cls = `cd${fut ? ' fut' : ''}${pre ? ' pre' : ''}${p == null ? ' none' : ''}${p != null ? ' hi' : ''}${k === t ? ' today' : ''}${note ? ' has-note' : ''}`;
+      const cls = `cd${breakAt(k) && !pre ? ' rest' : ''}${fut ? ' fut' : ''}${pre ? ' pre' : ''}${p == null ? ' none' : ''}${p != null ? ' hi' : ''}${k === t ? ' today' : ''}${note ? ' has-note' : ''}`;
       const tip = esc(`${DAYS_FULL[dow(d)]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}: ${p == null ? 'brak danych' : pct(p) + '%'}${note ? ' · ' + note : ''}`);
       cal += `<button class="${cls}" ${pre ? "disabled" : ""} data-goto="${key(startOfWeek(d))}" data-day="${k}" style="--i:${idx}${p == null ? '' : `;--heat:${heat(p)}`}" aria-label="${tip}"><b>${d.getDate()}</b>${p == null ? '' : `<small>${pct(p)}%</small>`}</button>`;
     });
@@ -200,11 +243,11 @@
     const rows = dates.map(d => ({ d, s: status(h, d), v: getVal(h, key(d)) }));
     let head, chart;
     if (h.type === 'num') {
-      const vals = rows.filter(r => !['off', 'pre', 'future'].includes(r.s) && r.v != null).map(r => r.v);
+      const vals = rows.filter(r => !['off', 'pre', 'future', 'rest'].includes(r.s) && r.v != null).map(r => r.v);
       const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null, p = avg == null ? null : avg / h.target;
       const scale = Math.max(h.target, ...vals, 0.0001) * 1.15;
       const bars = rows.map((r, j) => {
-        if (['off', 'pre'].includes(r.s)) return '<div class="sb none"><i></i></div>';
+        if (['off', 'pre', 'rest'].includes(r.s)) return '<div class="sb none"><i></i></div>';
         if (r.s === 'future' || r.v == null) return `<div class="sb empty"><span>${r.s === 'future' ? '' : '–'}</span><i></i></div>`;
         return `<div class="sb ${r.v >= h.target ? 'hit' : 'low'}" style="--j:${j}"><span>${nf(r.v)}</span><i style="height:${Math.max(2, r.v / scale * 100)}%;background:${heat(Math.min(1, r.v / h.target))}"></i></div>`;
       }).join('');
@@ -228,10 +271,13 @@
         chart = `<div class="scells" style="--n:${n}">${rows.filter(r => cols.includes(dow(r.d))).map(cell).join('')}</div>${names}`;
       }
     }
+    // rekord serii i najsłabszy dzień tygodnia
+    const bs = bestStreak(h).best, wd = weakestDay(h);
+    const chips = bs || wd >= 0 ? `<div class="schips">${bs ? `<span class="schip rec">${FLAME}rekord ${bs}</span>` : ''}${wd >= 0 ? `<span class="schip weak">najsłabszy: ${DAYS_FULL[wd].toLowerCase()}</span>` : ''}</div>` : '';
     box.innerHTML = `<div class="sbar"><button class="spick" data-sum-pick aria-label="Zmień nawyk"><b>${esc(h.name)}</b><span aria-hidden="true">▾</span></button>
         <div class="seg smode" role="group" aria-label="Okres"><button data-sum-mode="week" class="${month ? '' : 'on'}">Tydzień</button><button data-sum-mode="month" class="${month ? 'on' : ''}">Miesiąc</button></div></div>
       <div class="snav">${navBtn(-1)}<b>${rng}</b>${navBtn(1)}</div>
-      <article class="scard${animList ? ' enter' : ''}"><header><div><h3>${esc(h.name)}</h3><small>${head[0]}</small></div><strong class="${cls(head[1])}">${head[1] == null ? '—' : pct(head[1]) + '%'}</strong></header>${chart}</article>`;
+      <article class="scard${animList ? ' enter' : ''}"><header><div><h3>${esc(h.name)}</h3><small>${head[0]}</small></div><strong class="${cls(head[1])}">${head[1] == null ? '—' : pct(head[1]) + '%'}</strong></header>${chart}${chips}</article>`;
   }
 
   /* ---------- render ---------- */
@@ -290,7 +336,7 @@
       // Duży procent liczy jeden dzień: na telefonie oglądany, na komputerze dzisiejszy.
       const day = mobile ? selDay : dayOnly(new Date());
       const dp = dayPct(day), [a, b] = dayDone(day);
-      showPct(dp == null ? (key(day) > t ? null : 0) : pct(dp));
+      showPct(dp == null ? (key(day) > t || breakAt(key(day)) ? null : 0) : pct(dp)); // przerwa: bez procentu
       const hv = dp == null ? null : pct(dp);
       if (userAct && hero.k === key(day) && hero.v != null && hero.v < 100 && hv === 100) party = true;
       if (hv !== 100) partyLater = false;
@@ -339,10 +385,12 @@
     const overdue = [], skipped = []; // skipped: odpuszczone krzyżykiem, do przywrócenia z dołu listy
     if (showOverdue) for (const age of [2, 1]) {
       const d = addDays(dayOnly(new Date()), -age), k = key(d);
-      hs.forEach(h => { if (h.type !== 'num' && h.days.length < 7 && !nextDue(h, age) && ['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
+      hs.forEach(h => { if (h.type !== 'num' && !h.freq && h.days.length < 7 && !nextDue(h, age) && ['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
     }
     let rowIdx = 0;
+    const brk = breakAt(key(mobile ? selDay : dayOnly(new Date())));
     let html = mobile && overdue.length ? `<div class="grp later od-h" data-fk="g:od">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep" data-fk="g:od-sep"></div>` : '';
+    if (brk) html = `<div class="break-card" data-fk="g:break"><div class="bk-sea" aria-hidden="true">${SEA_SVG}<i class="bk-boat">${BOAT}</i></div><div class="bk-txt"><b>Przerwa</b><small>do ${fromKey(brk.to).getDate()} ${MONTHS_GEN[fromKey(brk.to).getMonth()]}</small></div><button class="bk-end" data-break-open>Zmień</button></div>` + html;
     html += onList.map(rowHtml).join('');
     if (offList.length) html += (onList.length ? `<div class="grp sep" data-fk="g:off-sep"></div>` : '') + offList.map(rowHtml).join('');
     if (later.length) html += `<div class="grp later" data-fk="g:later">Dodane później</div>` + later.map(rowHtml).join('');
@@ -375,8 +423,8 @@
         // łańcuch: zrobiony dzień połączony linią z zrobionym następnym; nowe ogniwo dorysowuje się od strony świeżo odhaczonego dnia
         const nd = !mobile && s === 'done' && shown[i + 1] && status(h, shown[i + 1]) === 'done' ? shown[i + 1] : null;
         const lnc = !nd ? '' : ' ln' + (justCell?.h === h.id ? justCell.k === key(d) ? ' ln-r' : justCell.k === key(nd) ? ' ln-l' : '' : '');
-        const dis = s === 'future' || s === 'off' || s === 'pre';
-        const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
+        const dis = s === 'future' || s === 'off' || s === 'pre' || s === 'rest';
+        const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'rest' ? 'przerwa' : s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
         return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}${lnc}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))};--lv:${waterLevel(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
       }).join('');
       const open = rowMenu === h.id;
@@ -387,12 +435,14 @@
       let sub = tgt(h), off = false;
       if (mobile) {
         const s = status(h, selDay), v = getVal(h, key(selDay));
-        off = s === 'off' || s === 'pre';
+        off = s === 'off' || s === 'pre' || s === 'rest';
         if (s === 'off') sub = 'nie dziś';
+        else if (s === 'rest') sub = 'przerwa';
+        else if (h.freq) sub = `${weekDone(h, selDay, false)} / ${h.freq} w tym tygodniu`;
         else if (h.type === 'num') sub = `${v == null ? 0 : nf(v)} / ${nf(h.target)} ${esc(h.unit)}`;
       }
       // licznik czasu: dla nawyków w minutach/godzinach, na dziś, dopóki cel nie jest zrobiony
-      const tk = todayKey(), canTime = timeUnit(h) && (mobile ? key(selDay) === tk : true) && status(h, fromKey(tk)) !== 'done' && status(h, fromKey(tk)) !== 'off';
+      const tk = todayKey(), canTime = timeUnit(h) && (mobile ? key(selDay) === tk : true) && !['done', 'off', 'rest'].includes(status(h, fromKey(tk)));
       const running = timer && timer.hid === h.id;
       const odTag = mobile ? '' : overdue.filter(o => o.h === h).map(o => `<span class="odtag${o.age === 2 ? ' old' : ''}">${o.age === 2 ? 'przedwczoraj' : 'wczoraj'}</span>`).join('');
       const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
@@ -404,7 +454,10 @@
       const tod = tl ? `<span class="tod">${tl}</span>` : '';
       // płomień rośnie na progach 7 / 14 / 30 dni; w dniu przekroczenia progu rozbłyska
       const tier = sk >= 30 ? 3 : sk >= 14 ? 2 : sk >= 7 ? 1 : 0;
-      const flare = justCell && justCell.h === h.id && [7, 14, 30].includes(sk) && status(h, fromKey(justCell.k)) === 'done';
+      const fresh = justCell && justCell.h === h.id && status(h, fromKey(justCell.k)) === 'done';
+      const rec = fresh && sk >= 3 && sk > bestStreak(h).prior;
+      if (rec) recordToast = `Nowy rekord serii: ${sk}`;
+      const flare = fresh && ([7, 14, 30].includes(sk) || rec);
       const fire = sk >= 2 ? `<span class="streak${tier ? ' t' + tier : ''}${flare ? ' flare' : ''}" aria-label="Seria: ${sk}">${FLAME}${sk}</span>` : '';
       return `<div class="o-row${open ? ' menu-open' : ''}${off ? ' is-off' : ''}" data-id="${h.id}" data-fk="h:${h.id}" style="--i:${idx}"><div class="name"><button class="grip" aria-label="Przenieś ${esc(h.name)}">${GRIP}</button><div class="nt"><b><span class="nm">${esc(h.name)}</span>${odTag}${tod}${fire}</b><small>${sub}</small></div>${tbtn}</div><div class="o-track">${cells}</div><div class="rmenu">${acts}</div></div>`;
     }
@@ -498,7 +551,9 @@
       <div class="row3" id="f-numfields"><div class="field"><label for="f-target">Cel dzienny</label><input id="f-target" type="number" min="0.01" step="any" value="${h?.target ?? ''}"></div><div class="field"><label for="f-unit">Jednostka</label><input id="f-unit" type="text" value="${h ? esc(h.unit) : ''}" maxlength="10"></div><div class="field"><label for="f-step">Krok +/−</label><input id="f-step" type="number" min="0.01" step="any" value="${h?.step ?? 1}"></div></div>
       <div class="field"><span class="lab">Timer</span><div class="seg seg3">${[['', 'Wył.'], ['min', 'Minuty'], ['h', 'Godziny']].map(([v, l]) => `<label><input type="radio" name="f-timer" value="${v}" ${(h ? timerOf(h) : '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
       <div class="field" id="f-durfield"><label for="f-dur">Czas</label><input id="f-dur" type="number" min="0.01" step="any" value="${h?.dur ?? ''}"></div>
-      <div class="field"><div class="daypick" role="group" aria-label="Dni nawyku">${DAYS.map((d, i) => `<label><input type="checkbox" id="f-d${i}" value="${i}" ${days.includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div><button type="button" class="allweek" id="f-all">Cały tydzień</button></div>
+      <div class="field"><span class="lab">Plan</span><div class="seg"><label><input type="radio" name="f-plan" value="days" ${!h?.freq ? 'checked' : ''}><span>Wybrane dni</span></label><label><input type="radio" name="f-plan" value="freq" ${h?.freq ? 'checked' : ''}><span>X razy w tygodniu</span></label></div></div>
+      <div class="field" id="f-freqfield"><div class="seg seg6">${[1, 2, 3, 4, 5, 6].map(n => `<label><input type="radio" name="f-freq" value="${n}" ${(h?.freq || 3) === n ? 'checked' : ''}><span>${n}×</span></label>`).join('')}</div></div>
+      <div class="field" id="f-daysfield"><div class="daypick" role="group" aria-label="Dni nawyku">${DAYS.map((d, i) => `<label><input type="checkbox" id="f-d${i}" value="${i}" ${days.includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div><button type="button" class="allweek" id="f-all">Cały tydzień</button></div>
       <div class="field"><span class="lab">Pora</span><div class="seg seg4">${[['', '—'], ...TIMES].map(([v, l]) => `<label><input type="radio" name="f-time" id="f-time-${v || 'any'}" value="${v}" ${(h?.time || '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
       <button class="primary" type="submit">${h ? 'Zapisz' : 'Dodaj'}</button>
       ${h ? `<button class="danger" type="button" id="f-delete">Usuń nawyk</button>` : ''}
@@ -508,17 +563,21 @@
     const sync = () => {
       const bool = f.querySelector('input[name="f-type"]:checked').value === 'bool', tm = f.querySelector('input[name="f-timer"]:checked').value;
       $('f-numfields').hidden = bool;
+      const freq = f.querySelector('input[name="f-plan"]:checked').value === 'freq';
+      $('f-freqfield').hidden = !freq; $('f-daysfield').hidden = freq;
       $('f-durfield').hidden = !bool || !tm; // tak/nie: ile trwa; liczbowy: timer odlicza do celu
       $('f-unit').readOnly = !bool && !!tm; if (!bool && tm) $('f-unit').value = tm; // liczbowy z timerem liczy w minutach albo godzinach
     };
-    f.querySelectorAll('input[name="f-type"], input[name="f-timer"]').forEach(r => r.addEventListener('change', sync)); sync();
+    f.querySelectorAll('input[name="f-type"], input[name="f-timer"], input[name="f-plan"]').forEach(r => r.addEventListener('change', sync)); sync();
     f.style.display = 'flex'; f.style.flexDirection = 'column'; f.style.gap = '16px';
     $('f-all').addEventListener('click', () => f.querySelectorAll('.daypick input').forEach(x => { x.checked = true; }));
     f.addEventListener('submit', e => {
       e.preventDefault();
       const name = $('f-name').value.trim(); if (!name) return;
       const type = f.querySelector('input[name="f-type"]:checked').value;
-      const sel = [...f.querySelectorAll('.daypick input:checked')].map(x => +x.value);
+      const freqOn = f.querySelector('input[name="f-plan"]:checked').value === 'freq';
+      const freq = freqOn ? +f.querySelector('input[name="f-freq"]:checked').value : 0;
+      const sel = freqOn ? [...ALL] : [...f.querySelectorAll('.daypick input:checked')].map(x => +x.value);
       if (!sel.length) { toast('Wybierz przynajmniej jeden dzień'); return; }
       const rawTarget = parseFloat($('f-target').value);
       if (type === 'num' && !(rawTarget > 0)) { toast('Podaj cel dzienny'); $('f-target').focus(); return; }
@@ -532,6 +591,7 @@
       const target_ = h || { id: 'h' + Date.now().toString(36), created: todayKey() };
       Object.assign(target_, { name, type, target, step, unit, days: sel, timer: tmr });
       if (type === 'bool' && tmr) target_.dur = dur; else delete target_.dur;
+      if (freq) target_.freq = freq; else delete target_.freq;
       if (time) target_.time = time; else delete target_.time;
       if (!h) state.habits.push(target_);
       save(); close(); render(); toast(h ? 'Zapisano' : `Dodano „${name}”`);
@@ -599,17 +659,51 @@
   $('menu-btn').addEventListener('click', () => {
     if (isMobile()) {
       const item = (v, label) => `<button class="nav-item${view === v ? ' on' : ''}" data-go-view="${v}">${label}</button>`;
-      overlay.innerHTML = sheet('Menu', '', `<nav class="navmenu">${item('week', 'Tydzień')}${item('calendar', 'Kalendarz')}${item('summary', 'Podsumowanie')}<button class="nav-item out" id="logout">Wyloguj się</button></nav>`, 'Menu');
+      overlay.innerHTML = sheet('Menu', '', `<nav class="navmenu">${item('week', 'Tydzień')}${item('calendar', 'Kalendarz')}${item('summary', 'Podsumowanie')}<button class="nav-item" data-break-open>Przerwa</button><button class="nav-item out" id="logout">Wyloguj się</button></nav>`, 'Menu');
       overlay.querySelectorAll('[data-go-view]').forEach(b => b.addEventListener('click', () => {
         const v = b.dataset.goView;
         if (v === 'calendar' && view !== 'calendar') monthStart = monthOf(selDay);
         close(); setView(v); window.scrollTo({ top: 0 });
       }));
     } else {
-      overlay.innerHTML = sheet(esc(window.Cloud?.user?.email || 'Konto'), '', `<button class="primary" id="logout">Wyloguj</button>`, 'Konto');
+      overlay.innerHTML = sheet(esc(window.Cloud?.user?.email || 'Konto'), '', `<button class="nav-item" data-break-open>Przerwa</button><button class="primary" id="logout">Wyloguj</button>`, 'Konto');
     }
     $('logout').addEventListener('click', confirmLogout);
   });
+  // Przerwa (urlop, choroba): od–do. W tym czasie nawyki się nie liczą, seria się nie zrywa, nie ma zaległości.
+  function openBreak() {
+    const t = todayKey();
+    const lbl = k => { const d = fromKey(k); return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`; };
+    const upcoming = Object.entries(state.breaks).filter(([, b]) => b.to >= t).sort((a, b) => a[1].from.localeCompare(b[1].from));
+    const items = upcoming.map(([id, b]) => {
+      const now = b.from <= t;
+      return `<div class="brk-item${now ? ' now' : ''}"><span>${lbl(b.from)} – ${lbl(b.to)}</span>${now
+        ? `<button class="end" data-brk-end="${id}">Zakończ</button>`
+        : `<button class="dots" data-brk-del="${id}" aria-label="Usuń przerwę">${XMARK}</button>`}</div>`;
+    }).join('');
+    overlay.innerHTML = sheet('Przerwa', '', `${items ? `<div class="brk-list">${items}</div>` : ''}
+      <div class="row2"><div class="field"><label for="b-from">Od</label><input id="b-from" type="date" value="${t}"></div><div class="field"><label for="b-to">Do</label><input id="b-to" type="date" value="${key(addDays(fromKey(t), 6))}"></div></div>
+      <div class="bk-quick">${[[3, '3 dni'], [7, 'Tydzień'], [14, '2 tygodnie']].map(([n, l]) => `<button type="button" class="allweek" data-brk-len="${n}">${l}</button>`).join('')}</div>
+      <button class="primary" id="b-save">Zacznij przerwę</button>`, 'Przerwa');
+    const done = () => { save(); close(); animList = true; render(); };
+    overlay.querySelectorAll('[data-brk-len]').forEach(b => b.addEventListener('click', () => {
+      const from = $('b-from').value || t;
+      $('b-to').value = key(addDays(fromKey(from), +b.dataset.brkLen - 1));
+    }));
+    overlay.querySelectorAll('[data-brk-del]').forEach(b => b.addEventListener('click', () => { delete state.breaks[b.dataset.brkDel]; done(); }));
+    // zakończenie trwającej przerwy: minione dni zostają wolne, od dziś nawyki znów się liczą
+    overlay.querySelectorAll('[data-brk-end]').forEach(b => b.addEventListener('click', () => {
+      const br = state.breaks[b.dataset.brkEnd], y = key(addDays(fromKey(t), -1));
+      if (br.from > y) delete state.breaks[b.dataset.brkEnd]; else state.breaks[b.dataset.brkEnd] = { ...br, to: y };
+      done();
+    }));
+    $('b-save').addEventListener('click', () => {
+      const from = $('b-from').value, to = $('b-to').value;
+      if (!from || !to || to < from) { toast('Sprawdź daty'); return; }
+      state.breaks['b' + Date.now().toString(36)] = { from, to };
+      done();
+    });
+  }
   function confirmLogout() {
     overlay.innerHTML = sheet('Czy chcesz się wylogować?', '', `<div class="confirm"><button data-close>Nie</button><button class="yes" id="confirm-logout">Tak</button></div>`);
     $('confirm-logout').addEventListener('click', async () => {
@@ -708,6 +802,7 @@
   /* ---------- zdarzenia ---------- */
   document.addEventListener('click', e => {
     const c = e.target.closest('.ob'); if (c && !c.disabled) {
+      if (e.clientX || e.clientY) ripple(e.clientX, e.clientY, .8);
       const h = state.habits.find(x => x.id === c.dataset.h);
       if (timer && timer.hid === h.id) { stopTimer(false); return; } // kółko przy działającym timerze = pauza
       // tak/nie: klik przełącza tylko zrobione ↔ puste
@@ -725,6 +820,7 @@
     const ts = e.target.closest('[data-timer]'); if (ts) { const h = state.habits.find(x => x.id === ts.dataset.timer); if (h) startTimer(h); return; }
     if (e.target.closest('[data-timer-stop]')) { stopTimer(false); return; }
     if (e.target.closest('[data-timer-close]')) { closeTimerCard(); return; }
+    if (e.target.closest('[data-break-open]')) { openBreak(); return; }
     const more = e.target.closest('[data-more]');
     if (more) { rowMenu = more.dataset.more; render(); document.querySelector(`[data-edit="${rowMenu}"]`)?.focus(); return; }
     const ed = e.target.closest('[data-edit]'); if (ed) { rowMenu = null; render(); openHabitForm(ed.dataset.edit); return; }
@@ -870,7 +966,7 @@
 
   /* ---------- telefon: przesuń wiersz w prawo = zrobione, w lewo = wyczyść ---------- */
   let swipe = null, suppressClick = false;
-  const canSwipe = id => { const h = state.habits.find(x => x.id === id); const s = h && status(h, selDay); return !!h && isMobile() && view === 'week' && !['off', 'pre', 'future'].includes(s); };
+  const canSwipe = id => { const h = state.habits.find(x => x.id === id); const s = h && status(h, selDay); return !!h && isMobile() && view === 'week' && !['off', 'pre', 'future', 'rest'].includes(s); };
   list.addEventListener('pointerdown', e => {
     const row = e.target.closest('.o-row');
     if (!row || drag || e.target.closest('.grip, .rmenu') || !canSwipe(row.dataset.id)) return;
@@ -912,19 +1008,68 @@
     const row = e.target.closest('.o-row');
     if (!row || e.target.closest('button, input, a, label') || calm()) return;
     row.animate({ transform: ['scale(1)', 'scale(1.025)', 'scale(1)'] }, { duration: 320, easing: 'cubic-bezier(.3,.7,.4,1)' });
+    ripple(e.clientX, e.clientY, 1);
   });
-  // Iskry z kółka przy odhaczeniu.
-  function sparks(el) {
+  /* ---------- morskie efekty: fale w tle, bąbelki, kręgi na wodzie, przypływ ---------- */
+  const sea = document.createElement('div');
+  sea.className = 'sea'; sea.setAttribute('aria-hidden', 'true');
+  sea.innerHTML = SEA_SVG + '<i class="amb"></i>'.repeat(7);
+  document.body.appendChild(sea);
+  sea.querySelectorAll('.amb').forEach((b, i) => {
+    b.style.left = (6 + i * 13 + Math.random() * 6).toFixed(1) + '%';
+    b.style.animationDelay = (i * 1.6 + Math.random() * 2).toFixed(1) + 's';
+    b.style.setProperty('--s', (4 + Math.random() * 6).toFixed(0) + 'px');
+  });
+  // Bąbelki z kółka przy odhaczeniu: unoszą się, kołyszą i pękają.
+  function bubbles(el) {
     if (calm()) return;
-    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, n = 10;
-    for (let i = 0; i < n; i++) {
-      const a = i / n * Math.PI * 2 + Math.random() * .5, d = r.width * .55 + 8 + Math.random() * 14, s = 3 + Math.random() * 3;
-      const p = document.createElement('i');
-      p.className = 'spark';
-      Object.assign(p.style, { left: cx - s / 2 + 'px', top: cy - s / 2 + 'px', width: s + 'px', height: s + 'px' });
-      document.body.appendChild(p);
-      p.animate({ transform: ['translate(0,0) scale(1)', `translate(${Math.cos(a) * d}px,${Math.sin(a) * d}px) scale(.2)`], opacity: [1, 1, 0] },
-        { duration: 460 + Math.random() * 180, easing: 'cubic-bezier(.2,.7,.3,1)' }).onfinish = () => p.remove();
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    for (let i = 0; i < 11; i++) {
+      const s = 4 + Math.random() * 7, dx = (Math.random() - .5) * r.width * 1.4, rise = 36 + Math.random() * 60, sway = (Math.random() - .5) * 18;
+      const b = document.createElement('i');
+      b.className = 'bubble';
+      Object.assign(b.style, { left: cx - s / 2 + 'px', top: cy - s / 2 + 'px', width: s + 'px', height: s + 'px' });
+      document.body.appendChild(b);
+      b.animate([
+        { transform: 'translate(0,0) scale(.3)', opacity: 0 },
+        { transform: `translate(${dx * .4}px,${-rise * .3}px) scale(1)`, opacity: 1, offset: .2 },
+        { transform: `translate(${dx * .7 + sway}px,${-rise * .7}px) scale(1)`, opacity: .9, offset: .7 },
+        { transform: `translate(${dx}px,${-rise}px) scale(1.5)`, opacity: 0 }
+      ], { duration: 700 + Math.random() * 500, delay: Math.random() * 120, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' }).onfinish = () => b.remove();
+      setTimeout(() => b.remove(), 1600); // zapas, gdy karta w tle wstrzyma animacje
+    }
+  }
+  // Kręgi na wodzie w miejscu dotknięcia.
+  function ripple(x, y, k = 1) {
+    if (calm()) return;
+    [0, 140].forEach(delay => {
+      const r = document.createElement('i');
+      r.className = 'ripple';
+      Object.assign(r.style, { left: x + 'px', top: y + 'px' });
+      document.body.appendChild(r);
+      r.animate({ transform: ['translate(-50%,-50%) scale(.1)', `translate(-50%,-50%) scale(${k})`], opacity: [.55, 0] },
+        { duration: 650, delay, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'backwards' }).onfinish = () => r.remove();
+      setTimeout(() => r.remove(), 1000);
+    });
+  }
+  // Przypływ: fale w tle wzbierają, z dna leci chmura bąbelków (świętowanie 100% dnia).
+  function swell() {
+    if (calm()) return;
+    sea.classList.remove('swell'); void sea.offsetWidth; sea.classList.add('swell');
+    setTimeout(() => sea.classList.remove('swell'), 2300);
+    for (let i = 0; i < 26; i++) {
+      const s = 5 + Math.random() * 10, x = Math.random() * innerWidth;
+      const b = document.createElement('i');
+      b.className = 'bubble';
+      Object.assign(b.style, { left: x + 'px', top: innerHeight - 10 + 'px', width: s + 'px', height: s + 'px' });
+      document.body.appendChild(b);
+      const rise = innerHeight * (.3 + Math.random() * .45), sway = (Math.random() - .5) * 60;
+      b.animate([
+        { transform: 'translate(0,0)', opacity: 0 },
+        { transform: `translate(${sway * .5}px,${-rise * .4}px)`, opacity: .9, offset: .3 },
+        { transform: `translate(${sway}px,${-rise}px) scale(1.4)`, opacity: 0 }
+      ], { duration: 1400 + Math.random() * 900, delay: Math.random() * 500, easing: 'ease-out', fill: 'backwards' }).onfinish = () => b.remove();
+      setTimeout(() => b.remove(), 3200);
     }
   }
   // Domknięcie dnia: zielona fala po kafelkach i podskok procentu.
@@ -933,6 +1078,7 @@
     if (calm()) return;
     $('week-pct').animate({ transform: ['scale(1)', 'scale(1.14)', 'scale(.98)', 'scale(1)'], color: ['#fff', '#4ADE80', '#4ADE80', '#fff'] }, { duration: 900, easing: 'ease-out' });
     const off = 'inset 0 0 0 1px rgba(74,222,128,0), 0 0 0 0 rgba(74,222,128,0)';
+    swell();
     [...list.querySelectorAll('.o-row[data-id]:not(.is-off)')].forEach((r, i) => r.animate(
       { boxShadow: [off, 'inset 0 0 0 1px rgba(74,222,128,.9), 0 0 24px 0 rgba(74,222,128,.28)', off], transform: ['none', 'scale(1.015)', 'none'] },
       { duration: 650, delay: 120 + i * 80, easing: 'ease-out' }));
@@ -958,7 +1104,8 @@
       const top = waterTop;
       c.querySelectorAll('.wv').forEach(w => w.animate({ top: [top(was), top(p)] }, { duration: 650, easing: 'cubic-bezier(.3,.7,.3,1)' }));
     });
-    if (justCell) { const c = el.querySelector(`.ob[data-h="${CSS.escape(justCell.h)}"][data-k="${justCell.k}"] .c.done`); if (c) { if (c === filled) setTimeout(() => sparks(c), 560); else sparks(c); } }
+    if (justCell) { const c = el.querySelector(`.ob[data-h="${CSS.escape(justCell.h)}"][data-k="${justCell.k}"] .c.done`); if (c) { if (c === filled) setTimeout(() => bubbles(c), 560); else bubbles(c); } }
+    if (recordToast) { const m = recordToast; recordToast = null; setTimeout(() => toast(m), 500); }
     // koniec timera: jedno spokojne, zielone pulsowanie kafelka
     if (timerDone) {
       const r = el.querySelector(`.o-row[data-id="${CSS.escape(timerDone)}"]`); timerDone = null;

@@ -484,3 +484,73 @@ button:not(:disabled):active{transform:scale(.96)}
 @keyframes t-blink{50%{opacity:.4}}
 .tact.swap .tstop{animation:check-pop .32s var(--ease)}
 @media (max-width:680px){.timer-card{gap:6px 10px;padding:12px 12px 12px 14px}.timer-card .ttime{font-size:24px}.tstop{padding:0 12px}}
+
+/* ================= morski motyw ================= */
+:root{--sea:#2DD4BF}
+
+/* fale (wspólne) */
+.waves{display:block;overflow:visible}
+.waves path{animation:drift 11s linear infinite}
+.waves .w1{fill:color-mix(in srgb,var(--sea) 22%,transparent)}
+.waves .w2{fill:color-mix(in srgb,var(--accent) 16%,transparent);animation-duration:16s;animation-direction:reverse}
+.waves .w3{fill:color-mix(in srgb,var(--sea) 30%,transparent);animation-duration:7s}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(-100px)}}
+
+/* morze w tle na dole ekranu, z pojedynczymi bąbelkami */
+.sea{position:fixed;left:0;right:0;bottom:0;height:110px;z-index:-1;pointer-events:none;opacity:.55;transform-origin:bottom}
+.sea .waves{position:absolute;left:0;bottom:0;width:100%;height:100%}
+.sea .amb{position:absolute;bottom:4px;width:var(--s,6px);height:var(--s,6px);border-radius:50%;border:1px solid color-mix(in srgb,var(--sea) 65%,transparent);opacity:0;animation:amb 10s ease-in infinite}
+@keyframes amb{0%{transform:translate(0,0);opacity:0}15%{opacity:.8}70%{opacity:.5}100%{transform:translate(8px,-110px);opacity:0}}
+.sea.swell{animation:swell 2.2s cubic-bezier(.3,.7,.3,1)}
+@keyframes swell{0%{transform:none}35%{transform:scaleY(2.1);opacity:1}100%{transform:none}}
+
+/* bąbelki i kręgi na wodzie */
+.bubble{position:fixed;z-index:50;pointer-events:none;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--sea) 80%,#fff);background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.75) 0 16%,transparent 22%),color-mix(in srgb,var(--sea) 14%,transparent)}
+.ripple{position:fixed;z-index:50;pointer-events:none;width:70px;height:70px;border-radius:50%;border:2px solid color-mix(in srgb,var(--sea) 70%,transparent)}
+.spark{display:none}
+
+/* powitanie dnia: kafelki wypływają jak boje */
+.o-list.hello .o-row{animation:float-in .8s cubic-bezier(.3,1.3,.5,1) backwards;animation-delay:calc(var(--i,0)*80ms)}
+.o-list.hello .o-row.od{animation:float-in .8s cubic-bezier(.3,1.3,.5,1) backwards,od-flash .9s ease-out;animation-delay:calc(var(--i,0)*80ms),calc(var(--i,0)*80ms + 600ms)}
+@keyframes float-in{0%{opacity:0;transform:translateY(46px)}55%{opacity:1;transform:translateY(-6px)}75%{transform:translateY(3px)}100%{opacity:1;transform:none}}
+
+/* pasek timera płynie jak prąd */
+.tbar i{background:linear-gradient(90deg,var(--accent),var(--sea),var(--accent));background-size:200% 100%;animation:tide 2.4s linear infinite}
+.timer-card.paused .tbar i{background:var(--ink-3);animation:none}
+@keyframes tide{from{background-position:0 0}to{background-position:-200% 0}}
+
+/* przerwa */
+.break-card{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 34px;border-radius:var(--radius);background:linear-gradient(180deg,color-mix(in srgb,var(--sea) 10%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,var(--sea) 35%,var(--line))}
+.bk-sea{position:absolute;left:0;right:0;bottom:0;height:36px;pointer-events:none}
+.bk-sea .waves{position:absolute;inset:0;width:100%;height:100%}
+.bk-txt{position:relative;display:flex;flex-direction:column}
+.bk-txt b{font-weight:700;font-size:17px}
+.bk-txt small{color:var(--ink-2);font-size:12.5px}
+.bk-end{position:relative;height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-weight:600;font-size:13px;color:var(--ink-2)}
+.bk-end:hover{color:var(--ink);background:var(--surface-3)}
+.bk-boat{position:absolute;bottom:13px;left:-30px;color:var(--ink-2);animation:sail 24s linear infinite}
+.bk-boat svg{display:block;transform-origin:50% 100%;animation:bob 2.6s ease-in-out infinite}
+@keyframes sail{from{left:-30px}to{left:100%}}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-3px) rotate(5deg)}}
+.c.rest{background:color-mix(in srgb,var(--sea) 10%,transparent)}
+.c.rest::after{content:"~";color:var(--sea);font-weight:700}
+.cd.rest{background:color-mix(in srgb,var(--sea) 12%,var(--surface-2));color:var(--ink-2)}
+.cd.rest::after{content:"~";position:absolute;bottom:2px;left:0;right:0;text-align:center;font-weight:700;font-size:12px;color:var(--sea)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field input[type=date]{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--radius);padding:10px 12px;font:inherit;width:100%;color-scheme:dark;min-width:0}
+.bk-quick{display:flex;gap:8px;flex-wrap:wrap}
+.brk-list{display:flex;flex-direction:column;gap:6px}
+.brk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 12px;border-radius:var(--radius);background:color-mix(in srgb,var(--sea) 8%,var(--surface-2));border:1px solid color-mix(in srgb,var(--sea) 25%,var(--line));font-size:14px}
+.brk-item .end{height:30px;padding:0 12px;border-radius:999px;font-weight:600;font-size:13px;color:var(--sea);border:1px solid color-mix(in srgb,var(--sea) 40%,transparent)}
+
+/* X razy w tygodniu: dzień dowolny */
+.c.free{box-shadow:inset 0 0 0 1.5px var(--surface-3);outline:1.5px dashed var(--ink-3);outline-offset:-1.5px}
+.c.free::after{content:"+";color:var(--ink-3);font-weight:700}
+.seg.seg6{grid-template-columns:repeat(6,1fr)}
+.seg.seg6 label{padding:8px 2px}
+
+/* podsumowanie: rekord serii i najsłabszy dzień */
+.schips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.schip{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--f-mono);padding:5px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.schip.rec{color:var(--warn)}
+.schip.weak{color:color-mix(in srgb,var(--miss) 85%,var(--ink))}
