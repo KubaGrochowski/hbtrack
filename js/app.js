@@ -30,6 +30,18 @@
     if (!s.skips || typeof s.skips !== 'object') s.skips = {};
     if (!s.spent || typeof s.spent !== 'object') s.spent = {};
     if (!s.breaks || typeof s.breaks !== 'object') s.breaks = {}; // przerwy (urlop, choroba): id → { from, to }
+    // Timer jest osobnym rodzajem nawyku: dawne „tak/nie z czasem” i „liczbowe z timerem” stają się nawykami-timerami w minutach.
+    s.habits.forEach(h => {
+      const e = s.entries[h.id];
+      if (h.type === 'bool' && h.timer && h.dur) {
+        const m = Math.round(h.timer === 'h' ? h.dur * 60 : h.dur);
+        Object.assign(h, { type: 'num', target: m, unit: 'min', step: 5, clock: true, timer: 'min' }); delete h.dur;
+        if (e) Object.keys(e).forEach(k => { if (e[k] >= 1) e[k] = m; else delete e[k]; });
+      } else if (h.type === 'num' && (h.timer === 'min' || h.timer === 'h') && !h.clock) {
+        if (h.timer === 'h') { h.target = +(h.target * 60).toFixed(2); h.step = Math.max(1, Math.round(h.step * 60)); if (e) Object.keys(e).forEach(k => { e[k] = +(e[k] * 60).toFixed(2); }); }
+        Object.assign(h, { unit: 'min', clock: true, timer: 'min' });
+      }
+    });
     Object.keys(s.spent).forEach(k => { if ((k.split('|')[1] || '') < todayKey()) delete s.spent[k]; });
     // odpuszczone zaległości starsze niż tydzień nie są już potrzebne
     const old = key(addDays(new Date(), -7));
@@ -425,6 +437,8 @@
         const lnc = !nd ? '' : ' ln' + (justCell?.h === h.id ? justCell.k === key(d) ? ' ln-r' : justCell.k === key(nd) ? ' ln-l' : '' : '');
         const dis = s === 'future' || s === 'off' || s === 'pre' || s === 'rest';
         const lbl = `${h.name}, ${DAYS_FULL[dow(d)]} ${d.getDate()}: ${s === 'rest' ? 'przerwa' : s === 'off' ? 'poza planem' : s === 'pre' ? 'przed dodaniem' : s === 'future' ? 'przyszłość' : v == null ? 'brak wpisu' : fmt(h, v) + ' ' + (h.unit || '')}`;
+        // nawyk-timer: zamiast kółka sam zegar (pierścień = postęp, kręcące się wskazówki = odlicza)
+        if (h.clock) return `<button class="ob ck ${s} ${key(d) === t ? 'today' : ''}${lnc}" data-h="${h.id}" data-k="${key(d)}" data-clock ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ck ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}${timer && timer.hid === h.id && timer.k === key(d) ? ' run' : ''}" style="--p:${pct(prog(h, v))}">${CLOCK}</span></button>`;
         return `<button class="ob ${s} ${key(d) === t ? 'today' : ''}${lnc}" data-h="${h.id}" data-k="${key(d)}" ${dis ? 'disabled' : ''} aria-label="${esc(lbl)}"><span class="c ${s}${justCell && justCell.h === h.id && justCell.k === key(d) ? ' just' : ''}"${h.type === 'num' ? ` data-lv="${h.id}|${key(d)}"` : ''} style="--p:${pct(prog(h, v))};--lv:${waterLevel(prog(h, v))}">${s === 'done' ? CHECK : s === 'part' ? WATER : ''}</span></button>`;
       }).join('');
       const open = rowMenu === h.id;
@@ -445,8 +459,7 @@
       const tk = todayKey(), canTime = timeUnit(h) && (mobile ? key(selDay) === tk : true) && !['done', 'off', 'rest'].includes(status(h, fromKey(tk)));
       const running = timer && timer.hid === h.id;
       const odTag = mobile ? '' : overdue.filter(o => o.h === h).map(o => `<span class="odtag${o.age === 2 ? ' old' : ''}">${o.age === 2 ? 'przedwczoraj' : 'wczoraj'}</span>`).join('');
-      const tbtn = running ? `<button class="tbtn on" data-timer-stop aria-label="Zatrzymaj licznik">${STOP}</button>`
-        : canTime ? `<button class="tbtn" data-timer="${h.id}" aria-label="Uruchom licznik: ${esc(h.name)}">${CLOCK}</button>` : '';
+      const tbtn = '';
       if (running) sub = `<span data-timer-left>${fmtLeft(timerLeft())}</span> pozostało`;
       else if (canTime && h.type === 'bool' && spentOf(h, tk) > 0) sub = `${fmtLeft(timerNeed(h, tk))} pozostało`;
       const sk = streak(h);
@@ -547,10 +560,9 @@
     const days = h ? h.days : [];
     const body = `<form id="hform">
       <div class="field"><label for="f-name">Nazwa</label><input id="f-name" type="text" required maxlength="30" value="${h ? esc(h.name) : ''}"></div>
-      <div class="field"><span class="lab">Rodzaj</span><div class="seg"><label><input type="radio" name="f-type" id="f-type-bool" value="bool" ${!h || h.type === 'bool' ? 'checked' : ''}><span>Tak / nie</span></label><label><input type="radio" name="f-type" id="f-type-num" value="num" ${h && h.type === 'num' ? 'checked' : ''}><span>Liczbowy</span></label></div></div>
+      <div class="field"><span class="lab">Rodzaj</span><div class="seg seg3"><label><input type="radio" name="f-type" id="f-type-bool" value="bool" ${!h || h.type === 'bool' ? 'checked' : ''}><span>Tak / nie</span></label><label><input type="radio" name="f-type" id="f-type-num" value="num" ${h && h.type === 'num' && !h.clock ? 'checked' : ''}><span>Liczbowy</span></label><label><input type="radio" name="f-type" id="f-type-timer" value="timer" ${h?.clock ? 'checked' : ''}><span>Timer</span></label></div></div>
       <div class="row3" id="f-numfields"><div class="field"><label for="f-target">Cel dzienny</label><input id="f-target" type="number" min="0.01" step="any" value="${h?.target ?? ''}"></div><div class="field"><label for="f-unit">Jednostka</label><input id="f-unit" type="text" value="${h ? esc(h.unit) : ''}" maxlength="10"></div><div class="field"><label for="f-step">Krok +/−</label><input id="f-step" type="number" min="0.01" step="any" value="${h?.step ?? 1}"></div></div>
-      <div class="field"><span class="lab">Timer</span><div class="seg seg3">${[['', 'Wył.'], ['min', 'Minuty'], ['h', 'Godziny']].map(([v, l]) => `<label><input type="radio" name="f-timer" value="${v}" ${(h ? timerOf(h) : '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
-      <div class="field" id="f-durfield"><label for="f-dur">Czas</label><input id="f-dur" type="number" min="0.01" step="any" value="${h?.dur ?? ''}"></div>
+      <div class="field" id="f-minfield"><label for="f-min">Minut dziennie</label><input id="f-min" type="number" min="1" step="1" inputmode="numeric" value="${h?.clock ? h.target : ''}"></div>
       <div class="field"><span class="lab">Plan</span><div class="seg"><label><input type="radio" name="f-plan" value="days" ${!h?.freq ? 'checked' : ''}><span>Wybrane dni</span></label><label><input type="radio" name="f-plan" value="freq" ${h?.freq ? 'checked' : ''}><span>X razy w tygodniu</span></label></div></div>
       <div class="field" id="f-freqfield"><div class="seg seg6">${[1, 2, 3, 4, 5, 6].map(n => `<label><input type="radio" name="f-freq" value="${n}" ${(h?.freq || 3) === n ? 'checked' : ''}><span>${n}×</span></label>`).join('')}</div></div>
       <div class="field" id="f-daysfield"><div class="daypick" role="group" aria-label="Dni nawyku">${DAYS.map((d, i) => `<label><input type="checkbox" id="f-d${i}" value="${i}" ${days.includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div><button type="button" class="allweek" id="f-all">Cały tydzień</button></div>
@@ -561,36 +573,36 @@
     overlay.innerHTML = sheet(h ? 'Edytuj nawyk' : 'Nowy nawyk', '', body);
     const f = $('hform');
     const sync = () => {
-      const bool = f.querySelector('input[name="f-type"]:checked').value === 'bool', tm = f.querySelector('input[name="f-timer"]:checked').value;
-      $('f-numfields').hidden = bool;
+      const tp = f.querySelector('input[name="f-type"]:checked').value;
+      $('f-numfields').hidden = tp !== 'num';
+      $('f-minfield').hidden = tp !== 'timer';
       const freq = f.querySelector('input[name="f-plan"]:checked').value === 'freq';
       $('f-freqfield').hidden = !freq; $('f-daysfield').hidden = freq;
-      $('f-durfield').hidden = !bool || !tm; // tak/nie: ile trwa; liczbowy: timer odlicza do celu
-      $('f-unit').readOnly = !bool && !!tm; if (!bool && tm) $('f-unit').value = tm; // liczbowy z timerem liczy w minutach albo godzinach
     };
-    f.querySelectorAll('input[name="f-type"], input[name="f-timer"], input[name="f-plan"]').forEach(r => r.addEventListener('change', sync)); sync();
+    f.querySelectorAll('input[name="f-type"], input[name="f-plan"]').forEach(r => r.addEventListener('change', sync)); sync();
     f.style.display = 'flex'; f.style.flexDirection = 'column'; f.style.gap = '16px';
     $('f-all').addEventListener('click', () => f.querySelectorAll('.daypick input').forEach(x => { x.checked = true; }));
     f.addEventListener('submit', e => {
       e.preventDefault();
       const name = $('f-name').value.trim(); if (!name) return;
-      const type = f.querySelector('input[name="f-type"]:checked').value;
+      const kind = f.querySelector('input[name="f-type"]:checked').value, isTimer = kind === 'timer', type = isTimer ? 'num' : kind;
+      const mins = parseFloat($('f-min').value);
+      if (isTimer && !(mins > 0)) { toast('Podaj minuty'); $('f-min').focus(); return; }
       const freqOn = f.querySelector('input[name="f-plan"]:checked').value === 'freq';
       const freq = freqOn ? +f.querySelector('input[name="f-freq"]:checked').value : 0;
       const sel = freqOn ? [...ALL] : [...f.querySelectorAll('.daypick input:checked')].map(x => +x.value);
       if (!sel.length) { toast('Wybierz przynajmniej jeden dzień'); return; }
       const rawTarget = parseFloat($('f-target').value);
-      if (type === 'num' && !(rawTarget > 0)) { toast('Podaj cel dzienny'); $('f-target').focus(); return; }
+      if (kind === 'num' && !(rawTarget > 0)) { toast('Podaj cel dzienny'); $('f-target').focus(); return; }
       const target = Math.max(0.01, rawTarget || 1);
       const step = Math.max(0.01, parseFloat($('f-step').value) || 1);
       const unit = $('f-unit').value.trim();
       const time = f.querySelector('input[name="f-time"]:checked')?.value || '';
-      const tmr = f.querySelector('input[name="f-timer"]:checked')?.value || '', dur = parseFloat($('f-dur').value);
-      if (type === 'bool' && tmr && !(dur > 0)) { toast('Podaj czas'); $('f-dur').focus(); return; }
       // nawyk obowiązuje od dnia dodania; wcześniejsze dni pokazują „?”
       const target_ = h || { id: 'h' + Date.now().toString(36), created: todayKey() };
-      Object.assign(target_, { name, type, target, step, unit, days: sel, timer: tmr });
-      if (type === 'bool' && tmr) target_.dur = dur; else delete target_.dur;
+      Object.assign(target_, isTimer ? { name, type, target: Math.round(mins), step: 5, unit: 'min', days: sel, timer: 'min', clock: true } : { name, type, target, step, unit, days: sel, timer: '' });
+      if (!isTimer) delete target_.clock;
+      delete target_.dur;
       if (freq) target_.freq = freq; else delete target_.freq;
       if (time) target_.time = time; else delete target_.time;
       if (!h) state.habits.push(target_);
@@ -721,11 +733,10 @@
   const TIMER_KEY = 'hbtrack.timer';
   const readTimer = () => { try { return JSON.parse(localStorage.getItem(TIMER_KEY)); } catch (_) { return null; } };
   let timer = readTimer(), timerInt = null;
-  const guessTimer = h => h.type === 'num' ? (/^(min|minut[ay]?)$/i.test(h.unit) ? 'min' : /^(h|godz.?|godzin[ay]?)$/i.test(h.unit) ? 'h' : '') : '';
-  const timerOf = h => h.timer !== undefined ? h.timer : guessTimer(h);
+  const timerOf = h => h.clock ? 'min' : '';
   const timeUnit = h => { const t = timerOf(h); return t === 'min' ? 60 : t === 'h' ? 3600 : 0; };
   // nawyk tak/nie z timerem: czas z kreatora (h.dur); liczbowy: brakująca część celu
-  const timerGoal = h => h.type === 'bool' ? (h.dur || 0) : h.target;
+  const timerGoal = h => h.target;
   const timerLeft = () => timer ? Math.max(0, timer.seconds - (Date.now() - timer.startedAt) / 1000) : 0;
   const fmtLeft = sec => { const s = Math.ceil(sec), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + pad(mm) : mm) + ':' + pad(ss); };
   const spentOf = (h, k) => state.spent[h.id + '|' + k] || 0;
@@ -805,6 +816,8 @@
       if (e.clientX || e.clientY) ripple(e.clientX, e.clientY, .8);
       const h = state.habits.find(x => x.id === c.dataset.h);
       if (timer && timer.hid === h.id) { stopTimer(false); return; } // kółko przy działającym timerze = pauza
+      // zegar: dziś startuje odliczanie, w inne dni (albo po osiągnięciu celu) otwiera edycję minut
+      if (c.hasAttribute('data-clock')) { if (c.dataset.k === todayKey() && timerNeed(h, c.dataset.k) > 0) startTimer(h); else openEditor(h.id, c.dataset.k); return; }
       // tak/nie: klik przełącza tylko zrobione ↔ puste
       if (h.type === 'bool') { const od = c.hasAttribute('data-od'); setVal(h, c.dataset.k, getVal(h, c.dataset.k) === 1 ? null : 1); justCell = { h: h.id, k: c.dataset.k }; if (od) renderSmooth(); else render(); if (od) toast(`Nadrobione: ${h.name}`); }
       else openEditor(h.id, c.dataset.k);
