@@ -46,6 +46,12 @@ W Supabase: tabela `public.user_data (user_id, data jsonb, updated_at)` z RLS (k
 - Uchwyt ⋮⋮ przy nazwie: przeciągnij, żeby zmienić kolejność.
 - Telefon: jeden dzień na ekranie; przesuń wiersz w prawo = zrobione, w lewo = wyczyść.
 - Notatka do dnia: na telefonie pole pod datą, na komputerze klik w dzień w nagłówku; w kalendarzu dzień z notatką ma kropkę.
+- **Posiłki** (zakładka, na telefonie w menu ☰):
+  - **+ Nowy posiłek** = kreator: nazwa, zdjęcie (zmniejszane do ~560 px), składniki z gramaturą i makro na 100 g (jak na opakowaniu). Kalorie liczą się same: białko i węgle 4 kcal/g, tłuszcz 9 kcal/g.
+  - **+** przy posiłku dodaje go do oglądanego dnia; klik w posiłek pokazuje zdjęcie, makro, składniki i dodanie z liczbą porcji („po dodaniu: X / Y kcal”), tam też Edytuj / Usuń.
+  - Klik w zjedzony posiłek: zmiana porcji albo usunięcie z dnia. Wpis ma własną kopię makro, więc edycja przepisu nie zmienia historii.
+  - Licznik na dole: zjedzone kcal i makro (białko, węgle, tłuszcz) względem zapotrzebowania; klik ustawia zapotrzebowanie. Duża liczba u góry = ile kcal zostało.
+  - Zdjęcia są w danych konta (synchronizują się), więc przy bardzo wielu posiłkach ze zdjęciami może zabraknąć miejsca w pamięci przeglądarki (~5 MB).
 - Strzałki **‹ ›** obok nagłówka dni (oraz ← →) przełączają tygodnie, w Kalendarzu miesiące. **Dziś** wraca do bieżącego.
 
 ## Struktura
