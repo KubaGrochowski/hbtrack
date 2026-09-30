@@ -331,13 +331,13 @@
     const isOff = h => ref && status(h, ref) === 'off';
     const cur = hs.filter(h => !isLater(h)), later = hs.filter(isLater);
     const onList = cur.filter(h => !isOff(h)), offList = cur.filter(isOff);
-    // Zaległe z wczoraj: pominięte lub częściowe, nieodpuszczone. Telefon: osobna sekcja na górze dzisiejszego dnia; komputer: plakietka przy nazwie.
+    // Zaległe z wczoraj: tylko nawyki tak/nie, które nie są codzienne, niezrobione i nieodpuszczone (liczbowe i codzienne nie trafiają do zaległych). Telefon: osobna sekcja na górze dzisiejszego dnia; komputer: plakietka przy nazwie.
     // Sięgają dwa dni wstecz: wczorajsze są pomarańczowe, przedwczorajsze (nienadrobione) czerwone.
     const showOverdue = mobile ? key(selDay) === t : key(dates[0]) <= t && t <= key(end);
     const overdue = [], skipped = []; // skipped: odpuszczone krzyżykiem, do przywrócenia z dołu listy
     if (showOverdue) for (const age of [2, 1]) {
       const d = addDays(dayOnly(new Date()), -age), k = key(d);
-      hs.forEach(h => { if (['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
+      hs.forEach(h => { if (h.type !== 'num' && h.days.length < 7 && ['miss', 'part'].includes(status(h, d))) (state.skips[h.id + '|' + k] ? skipped : overdue).push({ h, d, k, age }); });
     }
     let rowIdx = 0;
     let html = mobile && overdue.length ? `<div class="grp later od-h" data-fk="g:od">Zaległe</div>` + overdue.map(odRowHtml).join('') + `<div class="grp sep" data-fk="g:od-sep"></div>` : '';
